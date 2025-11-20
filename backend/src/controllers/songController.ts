@@ -36,6 +36,11 @@ export class SongController {
 
       // Get form fields
       const fields = data.fields as any;
+      
+      // Debug logging
+      console.log("📝 Received fields:", JSON.stringify(fields, null, 2));
+      console.log("📝 File info:", { filename: data.filename, mimetype: data.mimetype });
+      
       const title = fields.title?.value;
       const artistWallet = fields.artistWallet?.value;
       const pricePerPlay = parseFloat(fields.pricePerPlay?.value || "0");
@@ -48,7 +53,7 @@ export class SongController {
         reply.code(400);
         return {
           success: false,
-          error: "Title and artist wallet are required",
+          error: `Title and artist wallet are required. Got title: "${title}", wallet: "${artistWallet}"`,
         };
       }
 

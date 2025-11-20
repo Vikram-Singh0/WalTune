@@ -54,6 +54,7 @@ sui --version
 ```
 
 ### Get Testnet SUI Tokens
+
 Visit: https://faucet.sui.io/
 Paste your address from: `sui client active-address`
 

@@ -30,24 +30,29 @@ Duplicate module found: 0x00...0b::bridge
 ## Workaround Options
 
 ### Option A: Wait for Version Alignment (Recommended)
+
 Wait 1-2 days for either:
+
 - Testnet to upgrade to 1.61.1, OR
 - Sui to release hotfix for 1.61.1 CLI
 
-**Monitor**: 
+**Monitor**:
+
 - https://github.com/MystenLabs/sui/releases
 - Sui Discord #testnet channel
 
 ### Option B: Test with Mock IDs (Continue Development)
+
 While waiting, you can:
 
 1. **Use placeholder contract IDs in backend**:
+
 ```typescript
 // backend/src/sui/suiService.ts
 this.setContractIds(
-  '0x0000000000000000000000000000000000000000000000000000000000000000', // mock
-  '0x0000000000000000000000000000000000000000000000000000000000000001', // mock
-  '0x0000000000000000000000000000000000000000000000000000000000000002'  // mock
+  "0x0000000000000000000000000000000000000000000000000000000000000000", // mock
+  "0x0000000000000000000000000000000000000000000000000000000000000001", // mock
+  "0x0000000000000000000000000000000000000000000000000000000000000002" // mock
 );
 ```
 
@@ -57,7 +62,9 @@ this.setContractIds(
 5. Deploy contracts once version issue is resolved
 
 ### Option C: Use Devnet (May Work)
+
 Devnet might have different version:
+
 ```powershell
 sui client new-env --alias devnet --rpc https://fullnode.devnet.sui.io:443
 sui client switch --env devnet
@@ -66,7 +73,9 @@ sui client publish --gas-budget 100000000
 ```
 
 ### Option D: Build from Matching Source
+
 Build Sui CLI v1.61.0 from source (30+ minutes):
+
 ```powershell
 git clone https://github.com/MystenLabs/sui.git
 cd sui
@@ -77,12 +86,14 @@ cargo build --release --bin sui
 ## Current Setup Status
 
 ✅ **Ready to Deploy**:
+
 - Contracts build successfully (`sui move build` works)
 - 1 SUI available for gas
 - Move.toml properly configured
 - All code ready
 
 🔴 **Blocked By**:
+
 - CLI/Testnet version mismatch bug
 
 ## Recommended Next Steps
@@ -114,6 +125,7 @@ sui client publish --gas-budget 100000000
 ```
 
 Save the output:
+
 - Package ID
 - ArtistRegistry object ID
 - SongRegistry object ID

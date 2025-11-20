@@ -7,6 +7,7 @@
 ## ✅ COMPLETED TASKS
 
 ### 1. Backend Setup ✅
+
 - [x] Fastify server with TypeScript
 - [x] ES Modules configuration
 - [x] Port 3001, CORS enabled
@@ -19,6 +20,7 @@
 **Files**: `backend/src/index.ts`, `controllers/`, `routes/`, `services/`, `walrus/`, `sui/`
 
 ### 2. Frontend Setup ✅
+
 - [x] Next.js 16 + React 19 + Tailwind v4
 - [x] Port 3000
 - [x] 3 pages: Home, Explore, Dashboard
@@ -29,6 +31,7 @@
 **Files**: `frontend/app/`, `frontend/components/`, `frontend/lib/`
 
 ### 3. Smart Contracts ✅
+
 - [x] `artist.move` - Artist registry
 - [x] `song_registry.move` - Song metadata + walrus_blob_id
 - [x] `payment.move` - Micropayments
@@ -38,6 +41,7 @@
 **Files**: `contracts/*.move`
 
 ### 4. Sui CLI Setup ✅
+
 - [x] Installed via winget (v1.61.1)
 - [x] Configured testnet RPC: `https://fullnode.testnet.sui.io:443`
 - [x] Generated address: `0xb8675a17fca689548abfe0a1633879a6cbc3aaf5938bb1a0ece2b855311e5b30`
@@ -50,8 +54,10 @@
 ### Phase 1: Get Required Credentials
 
 #### Task 1.1: Get Testnet SUI Tokens 💰
+
 **Status**: Not Started
 **Action**:
+
 1. Visit: https://faucet.sui.io/?address=0xb8675a17fca689548abfe0a1633879a6cbc3aaf5938bb1a0ece2b855311e5b30
 2. Click "Request" button
 3. Wait for tokens (usually instant)
@@ -62,8 +68,10 @@
 ---
 
 #### Task 1.2: Get Walrus Testnet Access 🐋
+
 **Status**: Not Started
 **Action**:
+
 1. Visit Walrus documentation/testnet sign-up
 2. Request testnet access
 3. Obtain credentials:
@@ -79,15 +87,18 @@
 ### Phase 2: Deploy & Configure
 
 #### Task 2.1: Deploy Smart Contracts to Sui Testnet 📝
+
 **Status**: Not Started (Ready to deploy after getting SUI tokens)
 
 **Command**:
+
 ```powershell
 cd contracts
 sui client publish --gas-budget 100000000
 ```
 
 **Save These Values From Output**:
+
 ```
 📦 Package ID: 0x... (the main package identifier)
 🏛️ ArtistRegistry Object ID: 0x... (shared object for artist registry)
@@ -95,11 +106,12 @@ sui client publish --gas-budget 100000000
 ```
 
 **Example Output to Look For**:
+
 ```
 Created Objects:
 - ID: 0xabc123... , Owner: Shared
   ├─ Type: 0xpackage::artist::ArtistRegistry
-  
+
 - ID: 0xdef456... , Owner: Shared
   ├─ Type: 0xpackage::song_registry::SongRegistry
 ```
@@ -107,17 +119,20 @@ Created Objects:
 ---
 
 #### Task 2.2: Update Backend with Contract IDs 🔧
+
 **Status**: Not Started (depends on Task 2.1)
 
 **File**: `backend/src/sui/suiService.ts`
 
 **Action**:
+
 1. Open `suiService.ts`
 2. Call `setContractIds()` in constructor:
+
 ```typescript
 constructor() {
   this.suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
-  
+
   // Add these lines with YOUR deployed contract IDs:
   this.setContractIds(
     '0xYOUR_PACKAGE_ID',
@@ -133,11 +148,13 @@ constructor() {
 ---
 
 #### Task 2.3: Add Walrus Credentials to .env 🔐
+
 **Status**: Not Started (depends on Task 1.2)
 
 **File**: `backend/.env`
 
 **Create/Update with**:
+
 ```env
 # Server
 PORT=3001
@@ -163,9 +180,11 @@ NODE_ENV=development
 ### Phase 3: Test & Migrate
 
 #### Task 3.1: Test Song Upload with Walrus ✅
+
 **Status**: Not Started (depends on Task 2.3)
 
 **Test Flow**:
+
 1. Start backend: `cd backend && npm run dev`
 2. Start frontend: `cd frontend && npm run dev`
 3. Connect Sui wallet in browser
@@ -176,6 +195,7 @@ NODE_ENV=development
 8. Test playback
 
 **Success Criteria**:
+
 - No errors in upload
 - BlobId returned from Walrus
 - Audio plays in MusicPlayer
@@ -183,11 +203,13 @@ NODE_ENV=development
 ---
 
 #### Task 3.2: Migrate to Blockchain Storage 🔗
+
 **Status**: Not Started (depends on Tasks 2.2 and 3.1)
 
 **Files to Modify**:
 
 **1. `backend/src/controllers/songController.ts`**
+
 ```typescript
 // Current (line ~65):
 await metadataStore.storeSong(songData);
@@ -197,11 +219,11 @@ await suiService.storeSongMetadata({
   title: songData.title,
   artistId: songData.artistId,
   artistName: songData.artistName,
-  walrusBlobId: blobId,  // ✅ Critical: Link to Walrus
+  walrusBlobId: blobId, // ✅ Critical: Link to Walrus
   pricePerPlay: songData.pricePerPlay,
   duration: songData.duration,
   genre: songData.genre,
-  coverImage: songData.coverImage
+  coverImage: songData.coverImage,
 });
 ```
 
@@ -211,21 +233,23 @@ Update `GET /api/song` to query from blockchain instead of in-memory
 ---
 
 #### Task 3.3: Implement On-Chain Play Recording 💳
+
 **Status**: Not Started
 
 **File**: `backend/src/controllers/songController.ts`
 
 **Update `play()` method**:
+
 ```typescript
 async play(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) {
   const { id } = request.params;
-  
+
   // Get song from blockchain
   const song = await suiService.getSongMetadata(id);
-  
+
   // Record play on-chain (increments count + handles payment)
   await suiService.recordPlay(id, listenerAddress);
-  
+
   return reply.send({ success: true, song });
 }
 ```
@@ -233,9 +257,11 @@ async play(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyRe
 ---
 
 #### Task 3.4: Full End-to-End Testing 🧪
+
 **Status**: Not Started (final verification)
 
 **Test Scenario**:
+
 1. Artist registers (on-chain)
 2. Artist uploads song → Walrus stores MP3, blockchain stores metadata
 3. Listener browses Explore page → Queries blockchain
@@ -244,6 +270,7 @@ async play(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyRe
 6. Check artist earnings on Dashboard
 
 **Verify**:
+
 - Song appears immediately after upload
 - Play count increments on blockchain
 - Artist balance increases (check with `sui client gas`)
@@ -254,38 +281,41 @@ async play(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyRe
 
 ### Backend (`backend/.env`)
 
-| Variable | Description | Where to Get | Status |
-|----------|-------------|--------------|--------|
-| `PORT` | Backend server port | `3001` (default) | ✅ Set |
-| `WALRUS_PUBLISHER_URL` | Walrus upload endpoint | Walrus testnet docs | ❌ Pending |
-| `WALRUS_AGGREGATOR_URL` | Walrus download endpoint | Walrus testnet docs | ❌ Pending |
-| `SUI_NETWORK` | Sui network name | `testnet` | ✅ Can set now |
-| `SUI_PACKAGE_ID` | Deployed Move package ID | From `sui client publish` output | ❌ Pending deployment |
+| Variable                 | Description              | Where to Get                     | Status                |
+| ------------------------ | ------------------------ | -------------------------------- | --------------------- |
+| `PORT`                   | Backend server port      | `3001` (default)                 | ✅ Set                |
+| `WALRUS_PUBLISHER_URL`   | Walrus upload endpoint   | Walrus testnet docs              | ❌ Pending            |
+| `WALRUS_AGGREGATOR_URL`  | Walrus download endpoint | Walrus testnet docs              | ❌ Pending            |
+| `SUI_NETWORK`            | Sui network name         | `testnet`                        | ✅ Can set now        |
+| `SUI_PACKAGE_ID`         | Deployed Move package ID | From `sui client publish` output | ❌ Pending deployment |
 | `SUI_ARTIST_REGISTRY_ID` | ArtistRegistry object ID | From `sui client publish` output | ❌ Pending deployment |
-| `SUI_SONG_REGISTRY_ID` | SongRegistry object ID | From `sui client publish` output | ❌ Pending deployment |
+| `SUI_SONG_REGISTRY_ID`   | SongRegistry object ID   | From `sui client publish` output | ❌ Pending deployment |
 
 ### Frontend (`frontend/.env.local`)
 
-| Variable | Description | Where to Get | Status |
-|----------|-------------|--------------|--------|
-| `NEXT_PUBLIC_API_URL` | Backend API endpoint | `http://localhost:3001` | ✅ Hardcoded in api.ts |
-| `NEXT_PUBLIC_SUI_NETWORK` | Sui network | `testnet` | ✅ Set in sui-config.ts |
+| Variable                  | Description          | Where to Get            | Status                  |
+| ------------------------- | -------------------- | ----------------------- | ----------------------- |
+| `NEXT_PUBLIC_API_URL`     | Backend API endpoint | `http://localhost:3001` | ✅ Hardcoded in api.ts  |
+| `NEXT_PUBLIC_SUI_NETWORK` | Sui network          | `testnet`               | ✅ Set in sui-config.ts |
 
 ---
 
 ## 🔗 IMPORTANT LINKS & RESOURCES
 
 ### Sui Resources
+
 - **Testnet Faucet**: https://faucet.sui.io/
 - **Sui Explorer**: https://suiscan.xyz/testnet (view your transactions)
 - **Sui Wallet**: https://chrome.google.com/webstore (search "Sui Wallet")
 - **Sui Docs**: https://docs.sui.io/
 
 ### Walrus Resources
+
 - **Walrus Docs**: https://docs.walrus.site/ (check for testnet access)
 - **GitHub**: https://github.com/MystenLabs/walrus-docs
 
 ### Your Sui Addresses
+
 - **CLI Address**: `0xb8675a17fca689548abfe0a1633879a6cbc3aaf5938bb1a0ece2b855311e5b30`
 - **Alias**: `eloquent-labradorite`
 - **Check Balance**: `sui client gas`
@@ -296,23 +326,26 @@ async play(request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyRe
 ## 🚀 QUICK START COMMANDS
 
 ### Start Development Servers
+
 ```powershell
 # Terminal 1 - Backend
 cd backend
 npm run dev
 
-# Terminal 2 - Frontend  
+# Terminal 2 - Frontend
 cd frontend
 npm run dev
 ```
 
 ### Deploy Contracts (after getting SUI tokens)
+
 ```powershell
 cd contracts
 sui client publish --gas-budget 100000000
 ```
 
 ### Check Sui CLI Status
+
 ```powershell
 sui client active-address
 sui client envs
@@ -356,6 +389,7 @@ sui client gas
 - **Git**: Not using git per user preference
 
 **Need Help?**
+
 - Check `SUI_INTEGRATION_PLAN.md` for detailed architecture
 - Check `contracts/README.md` for contract specifications
 - Check `PROJECT_STATUS.md` for development notes

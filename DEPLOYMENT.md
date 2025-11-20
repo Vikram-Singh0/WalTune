@@ -7,6 +7,7 @@ Visit: https://faucet.sui.io/?address=0xb8675a17fca689548abfe0a1633879a6cbc3aaf5
 Click "Request" and wait ~30 seconds.
 
 Verify:
+
 ```powershell
 sui client gas
 ```
@@ -18,12 +19,14 @@ You should see at least 1 SUI coin.
 ## Step 2: Deploy Smart Contracts
 
 **Correct Command** (note: two dashes before gas-budget):
+
 ```powershell
 cd contracts
 sui client publish --gas-budget 100000000
 ```
 
 **Common Mistake**:
+
 ```powershell
 # ❌ WRONG (single dash)
 sui client publish -gas-budget 100000000
@@ -83,7 +86,7 @@ Find the constructor and update:
 ```typescript
 constructor() {
   this.suiClient = new SuiClient({ url: getFullnodeUrl('testnet') });
-  
+
   // Paste your actual IDs here:
   this.setContractIds(
     '0xYOUR_PACKAGE_ID_FROM_STEP_3',
@@ -123,12 +126,15 @@ https://suiscan.xyz/testnet/object/YOUR_PACKAGE_ID
 ## Troubleshooting
 
 ### Error: "Insufficient gas"
+
 - Run: `sui client gas` to check balance
 - Get more tokens: https://faucet.sui.io/
 
 ### Error: "invalid flag: -gas-budget"
+
 - Use double dash: `--gas-budget` not `-gas-budget`
 
 ### Error: "Cannot find module"
+
 - Make sure you're in the `contracts` folder
 - Run: `sui move build` first to verify contracts compile

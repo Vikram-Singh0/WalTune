@@ -257,7 +257,7 @@ export default function DashboardPage() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-[#4ade80]/10 to-blue-500/10 border border-white/10 rounded-3xl p-8 mb-12 relative overflow-hidden"
+          className="bg-linear-to-r from-[#4ade80]/10 to-blue-500/10 border border-white/10 rounded-3xl p-8 mb-12 relative overflow-hidden"
         >
           <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
             <div className="w-24 h-24 bg-[#4ade80]/20 rounded-full flex items-center justify-center border border-[#4ade80]/30">
@@ -346,7 +346,7 @@ export default function DashboardPage() {
                   transition={{ delay: i * 0.05 }}
                   className="flex items-center gap-6 p-4 bg-black/20 border border-white/5 rounded-xl hover:bg-white/5 hover:border-white/10 transition-all group"
                 >
-                  <div className="w-16 h-16 bg-gradient-to-br from-gray-800 to-black rounded-lg flex items-center justify-center shrink-0 border border-white/10 group-hover:border-[#4ade80]/30 transition-colors">
+                  <div className="w-16 h-16 bg-linear-to-br from-gray-800 to-black rounded-lg flex items-center justify-center shrink-0 border border-white/10 group-hover:border-[#4ade80]/30 transition-colors">
                     <Music className="w-8 h-8 text-gray-500 group-hover:text-[#4ade80] transition-colors" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -368,7 +368,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="text-xs text-gray-500">per play</div>
                     </div>
-                    <div className="text-right min-w-[80px]">
+                    <div className="text-right min-w-20">
                       <div className="font-bold text-white">
                         {song.totalPlays}
                       </div>
