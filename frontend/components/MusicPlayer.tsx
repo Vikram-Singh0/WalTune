@@ -26,6 +26,9 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("ended", () => setIsPlaying(false));
 
+    // Auto play when component mounts
+    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
@@ -67,53 +70,57 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white border-t shadow-lg z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-white/10 shadow-2xl z-50 text-white">
       <audio ref={audioRef} src={song.streamUrl} />
 
       <div className="container mx-auto px-4 py-4">
         {/* Progress Bar */}
-        <div className="mb-3">
+        <div className="mb-4 group">
           <input
             type="range"
             min={0}
             max={duration || 0}
             value={currentTime}
             onChange={handleSeek}
-            className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            className="w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-[#4ade80] hover:h-2 transition-all"
           />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <div className="flex justify-between text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-6">
           {/* Song Info */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div className="w-12 h-12 bg-purple-100 rounded flex items-center justify-center shrink-0">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="w-14 h-14 bg-gray-800 rounded-lg flex items-center justify-center shrink-0 overflow-hidden border border-white/10">
               {song.coverImage ? (
                 <img
                   src={song.coverImage}
                   alt={song.title}
-                  className="w-full h-full rounded object-cover"
+                  className="w-full h-full object-cover"
                 />
               ) : (
-                <span className="text-xl">🎵</span>
+                <span className="text-2xl">🎵</span>
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm truncate">{song.title}</p>
-              <p className="text-xs text-gray-600 truncate">
+              <p className="font-bold text-sm truncate text-white">{song.title}</p>
+              <p className="text-xs text-gray-400 truncate">
                 {song.artistName}
               </p>
             </div>
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            <button className="text-gray-400 hover:text-white transition-colors">
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07l-1.41-1.41a3 3 0 000-4.24l1.41-1.41z" /></svg>
+            </button>
+
             <button
               onClick={togglePlay}
-              className="w-12 h-12 rounded-full bg-purple-600 text-white flex items-center justify-center hover:bg-purple-700 transition-colors shrink-0"
+              className="w-12 h-12 rounded-full bg-[#4ade80] text-black flex items-center justify-center hover:bg-[#22c55e] transition-all hover:scale-105 shadow-[0_0_15px_rgba(74,222,128,0.4)] shrink-0"
             >
               {isPlaying ? (
                 <svg
@@ -129,7 +136,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
                 </svg>
               ) : (
                 <svg
-                  className="w-5 h-5"
+                  className="w-5 h-5 ml-0.5"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -143,9 +150,9 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
             </button>
 
             {/* Volume */}
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 group/vol">
               <svg
-                className="w-5 h-5 text-gray-600"
+                className="w-5 h-5 text-gray-400"
                 fill="currentColor"
                 viewBox="0 0 20 20"
               >
@@ -162,13 +169,13 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
                 step={0.01}
                 value={volume}
                 onChange={handleVolumeChange}
-                className="w-20 h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                className="w-20 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-[#4ade80]"
               />
             </div>
 
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 transition-colors shrink-0"
+              className="text-gray-400 hover:text-white transition-colors shrink-0 ml-4"
             >
               <svg
                 className="w-6 h-6"

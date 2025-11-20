@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Header } from "@/components/Header";
+import { Navbar } from "@/components/Navbar";
 import { SongCard } from "@/components/SongCard";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { Song } from "@/types";
@@ -55,23 +55,23 @@ export default function ExplorePage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header />
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
+      <Navbar />
 
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-6 pt-32 pb-16">
         {/* Header Section */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
+        <div className="mb-12">
+          <h1 className="text-5xl font-bold mb-4">
             Explore Music
           </h1>
-          <p className="text-gray-600">
+          <p className="text-gray-400 text-lg">
             Discover decentralized music from artists worldwide
           </p>
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-lg shadow-md p-4 mb-8">
-          <div className="flex flex-col md:flex-row gap-4">
+        <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 p-6 mb-12">
+          <div className="flex flex-col md:flex-row gap-6">
             {/* Search Bar */}
             <div className="flex-1">
               <div className="relative">
@@ -80,10 +80,10 @@ export default function ExplorePage() {
                   placeholder="Search songs or artists..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  className="w-full px-6 py-3 pl-12 bg-black/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-[#4ade80] focus:border-transparent text-white placeholder-gray-500"
                 />
                 <svg
-                  className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400"
+                  className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-500"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -99,14 +99,14 @@ export default function ExplorePage() {
             </div>
 
             {/* Genre Filter */}
-            <div className="md:w-48">
+            <div className="md:w-64">
               <select
                 value={genreFilter}
                 onChange={(e) => setGenreFilter(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-6 py-3 bg-black/50 border border-white/10 rounded-xl focus:ring-2 focus:ring-[#4ade80] focus:border-transparent text-white appearance-none cursor-pointer"
               >
                 {genres.map((genre) => (
-                  <option key={genre} value={genre}>
+                  <option key={genre} value={genre} className="bg-[#1a1a1a]">
                     {genre === "all" ? "All Genres" : genre}
                   </option>
                 ))}
@@ -117,19 +117,19 @@ export default function ExplorePage() {
 
         {/* Songs Grid */}
         {loading ? (
-          <div className="flex items-center justify-center py-20">
+          <div className="flex items-center justify-center py-32">
             <div className="text-center">
-              <div className="w-16 h-16 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Loading songs...</p>
+              <div className="w-16 h-16 border-4 border-[#4ade80] border-t-transparent rounded-full animate-spin mx-auto mb-6"></div>
+              <p className="text-gray-400">Loading songs...</p>
             </div>
           </div>
         ) : filteredSongs.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">🎵</div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">
+          <div className="text-center py-32 bg-[#1a1a1a] rounded-3xl border border-white/5">
+            <div className="text-6xl mb-6">🎵</div>
+            <h3 className="text-2xl font-bold text-white mb-3">
               No songs found
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-400">
               {searchQuery || genreFilter !== "all"
                 ? "Try adjusting your search or filters"
                 : "Be the first to upload a song!"}
@@ -137,13 +137,13 @@ export default function ExplorePage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
               {filteredSongs.map((song) => (
                 <SongCard key={song.id} song={song} onPlay={handlePlay} />
               ))}
             </div>
 
-            <div className="text-center mt-8 text-gray-600">
+            <div className="text-center mt-12 text-gray-500">
               Showing {filteredSongs.length} of {songs.length} songs
             </div>
           </>
