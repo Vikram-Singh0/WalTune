@@ -224,9 +224,14 @@ export default function Home() {
             Launch App <ArrowRight className="w-5 h-5" />
           </Link>
 
-          <div className="mt-24 text-gray-600 text-sm flex items-center gap-2">
-            <Music2 className="w-4 h-4" />
-            © 2024 WalTune. Built for the Walrus Haulout Hackathon.
+          <div className="mt-24 text-gray-600 text-sm flex flex-col items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Music2 className="w-4 h-4" />
+              © Built for the Walrus Haulout Hackathon.
+            </div>
+            <div className="text-gray-500">
+              Built with ❤️ by DonaLabs for creators and music lovers
+            </div>
           </div>
         </motion.div>
       </main>
