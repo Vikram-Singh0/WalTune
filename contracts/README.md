@@ -38,24 +38,35 @@ Walrus (Off-chain)          Sui Blockchain (On-chain)
 
 ### Prerequisites
 
-```bash
-# Install Sui CLI
-cargo install --locked --git https://github.com/MystenLabs/sui.git --branch testnet sui
+```powershell
+# ✅ CORRECT WAY: Install Sui CLI (Windows)
+winget install MystenLabs.Sui
+
+# Refresh PATH
+$env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
 
 # Check installation
 sui --version
+
+# Setup testnet
+"y`n`n0" | sui client
+# Creates address, connects to testnet, uses ed25519 keys
 ```
+
+### Get Testnet SUI Tokens
+Visit: https://faucet.sui.io/
+Paste your address from: `sui client active-address`
 
 ### Build Contracts
 
-```bash
+```powershell
 cd contracts
 sui move build
 ```
 
 ### Deploy to Testnet
 
-```bash
+```powershell
 sui client publish --gas-budget 100000000
 ```
 
