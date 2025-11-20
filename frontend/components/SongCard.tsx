@@ -9,8 +9,8 @@ interface SongCardProps {
 
 export function SongCard({ song, onPlay }: SongCardProps) {
   return (
-    <div className="bg-white rounded-lg shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group cursor-pointer">
-      <div className="relative aspect-square bg-linear-to-br from-purple-100 to-blue-100">
+    <div className="bg-[#1a1a1a] rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group cursor-pointer border border-white/5 hover:border-[#4ade80]/50">
+      <div className="relative aspect-square bg-gradient-to-br from-gray-800 to-gray-900">
         {song.coverImage ? (
           <img
             src={song.coverImage}
@@ -18,16 +18,19 @@ export function SongCard({ song, onPlay }: SongCardProps) {
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center">
+          <div className="w-full h-full flex items-center justify-center text-gray-700">
             <span className="text-6xl">🎵</span>
           </div>
         )}
 
         {/* Play Button Overlay */}
-        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
           <button
-            onClick={() => onPlay(song)}
-            className="w-16 h-16 rounded-full bg-purple-600 text-white flex items-center justify-center hover:bg-purple-700 transition-colors transform hover:scale-110"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay(song);
+            }}
+            className="w-16 h-16 rounded-full bg-[#4ade80] text-black flex items-center justify-center hover:bg-[#22c55e] transition-all transform hover:scale-110 shadow-[0_0_20px_rgba(74,222,128,0.5)]"
           >
             <svg
               className="w-8 h-8 ml-1"
@@ -40,19 +43,19 @@ export function SongCard({ song, onPlay }: SongCardProps) {
         </div>
       </div>
 
-      <div className="p-4">
-        <h3 className="font-bold text-lg mb-1 truncate" title={song.title}>
+      <div className="p-5">
+        <h3 className="font-bold text-lg mb-1 truncate text-white" title={song.title}>
           {song.title}
         </h3>
         <p
-          className="text-gray-600 text-sm mb-2 truncate"
+          className="text-gray-400 text-sm mb-3 truncate"
           title={song.artistName}
         >
           {song.artistName}
         </p>
 
-        <div className="flex items-center justify-between text-xs text-gray-500">
-          <span className="flex items-center gap-1">
+        <div className="flex items-center justify-between text-xs text-gray-500 border-t border-white/10 pt-3">
+          <span className="flex items-center gap-1.5">
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
               <path
@@ -61,16 +64,16 @@ export function SongCard({ song, onPlay }: SongCardProps) {
                 clipRule="evenodd"
               />
             </svg>
-            {song.totalPlays}
+            {song.totalPlays} plays
           </span>
-          <span className="font-semibold text-purple-600">
+          <span className="font-bold text-[#4ade80] bg-[#4ade80]/10 px-2 py-1 rounded-full">
             {song.pricePerPlay} SUI
           </span>
         </div>
 
         {song.genre && (
-          <div className="mt-2">
-            <span className="inline-block px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">
+          <div className="mt-3">
+            <span className="inline-block px-2.5 py-1 bg-white/5 text-gray-300 text-xs rounded-full border border-white/10">
               {song.genre}
             </span>
           </div>
