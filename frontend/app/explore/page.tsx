@@ -40,7 +40,7 @@ export default function ExplorePage() {
       console.log("📝 Found events:", events.data.length);
 
       // Parse events to get song data
-      const parsedSongs: Song[] = events.data
+      const parsedSongs = events.data
         .map((event: any) => {
           const fields = event.parsedJson;
           if (fields) {
@@ -57,11 +57,11 @@ export default function ExplorePage() {
               totalPlays: 0,
               uploadedAt: Number(fields.uploaded_at) || 0,
               streamUrl: getWalrusStreamUrl(fields.walrus_blob_id),
-            };
+            } as Song;
           }
           return null;
         })
-        .filter((song): song is Song => song !== null);
+        .filter((song): song is Song => song !== null) as Song[];
 
       console.log("✅ Loaded songs from events:", parsedSongs);
       setSongs(parsedSongs);

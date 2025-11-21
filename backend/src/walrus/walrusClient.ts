@@ -48,7 +48,7 @@ export class WalrusClient {
       for (const publisherUrl of publisherUrls) {
         try {
           console.log(`🔄 Trying publisher: ${publisherUrl}`);
-          
+
           const response = await axios.put(
             `${publisherUrl}/v1/store?epochs=${this.epochs}`,
             buffer,
@@ -66,7 +66,10 @@ export class WalrusClient {
           return response.data as WalrusUploadResult;
         } catch (error) {
           lastError = error as Error;
-          console.warn(`⚠️ Failed with ${publisherUrl}:`, (error as Error).message);
+          console.warn(
+            `⚠️ Failed with ${publisherUrl}:`,
+            (error as Error).message
+          );
           continue; // Try next endpoint
         }
       }
@@ -75,12 +78,12 @@ export class WalrusClient {
       throw lastError || new Error("All Walrus publisher endpoints failed");
     } catch (error) {
       console.error("❌ Walrus upload failed:", error);
-      
+
       if (axios.isAxiosError(error)) {
         const errorMsg = error.response?.data?.message || error.message;
         throw new Error(`Walrus publisher upload failed: ${errorMsg}`);
       }
-      
+
       throw new Error(
         `Walrus upload failed: ${
           error instanceof Error ? error.message : "Unknown error"

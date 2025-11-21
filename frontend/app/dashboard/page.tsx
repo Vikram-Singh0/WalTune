@@ -14,7 +14,11 @@ import {
   createRegisterArtistTx,
   createRegisterSongTx,
 } from "@/lib/sui-transactions";
-import { WALRUS_PUBLISHER_URL, getWalrusStreamUrl, PACKAGE_ID } from "@/lib/sui-config";
+import {
+  WALRUS_PUBLISHER_URL,
+  getWalrusStreamUrl,
+  PACKAGE_ID,
+} from "@/lib/sui-config";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic2,
