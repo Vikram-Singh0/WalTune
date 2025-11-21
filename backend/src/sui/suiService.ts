@@ -1,41 +1,37 @@
 import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import { Transaction } from "@mysten/sui/transactions";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { fromBase64 } from "@mysten/sui/utils";
 
 /**
  * Sui Client for interacting with the blockchain
- * This will be used to store metadata on-chain once smart contracts are deployed
+ * This stores song metadata on-chain after audio is uploaded to Walrus
  */
 export class SuiService {
   private client: SuiClient;
   private network: "testnet" | "mainnet";
-
-  // These will be set after deploying smart contracts
-  private packageId?: string;
-  private artistRegistryId?: string;
-  private songRegistryId?: string;
+  private packageId: string;
+  private artistRegistryId: string;
+  private songRegistryId: string;
 
   constructor() {
     this.network =
       (process.env.SUI_NETWORK as "testnet" | "mainnet") || "testnet";
     const rpcUrl = process.env.SUI_RPC_URL || getFullnodeUrl(this.network);
     this.client = new SuiClient({ url: rpcUrl });
-  }
 
-  /**
-   * Set smart contract package and object IDs after deployment
-   */
-  setContractIds(
-    packageId: string,
-    artistRegistryId: string,
-    songRegistryId: string
-  ) {
-    this.packageId = packageId;
-    this.artistRegistryId = artistRegistryId;
-    this.songRegistryId = songRegistryId;
+    // Load from environment variables
+    this.packageId = process.env.PACKAGE_ID || "";
+    this.artistRegistryId = process.env.ARTIST_REGISTRY_ID || "";
+    this.songRegistryId = process.env.SONG_REGISTRY_ID || "";
+
+    if (!this.packageId || !this.artistRegistryId || !this.songRegistryId) {
+      console.warn("⚠️ Sui contract addresses not configured in .env");
+    }
   }
 
   /**
    * Register artist on Sui blockchain
-   * This will call the Artist.move smart contract
    */
   async registerArtist(params: {
     walletAddress: string;
@@ -49,26 +45,17 @@ export class SuiService {
   }> {
     try {
       if (!this.packageId || !this.artistRegistryId) {
-        throw new Error(
-          "Smart contracts not deployed yet. Using in-memory storage."
-        );
+        throw new Error("Smart contracts not configured. Check .env file.");
       }
 
-      // TODO: Create transaction to call smart contract
-      // const tx = new TransactionBlock();
-      // tx.moveCall({
-      //   target: `${this.packageId}::artist::register`,
-      //   arguments: [
-      //     tx.object(this.artistRegistryId),
-      //     tx.pure(params.name),
-      //     tx.pure(params.bio || ''),
-      //   ],
-      // });
+      console.log("⛓️ Registering artist on Sui blockchain...");
 
-      // For now, return pending status
+      // Note: This requires the artist to sign the transaction
+      // For now, return pending until we implement wallet signing
       return {
         success: false,
-        error: "Smart contracts not yet deployed. Using in-memory storage.",
+        error:
+          "Artist registration requires wallet signature. Use frontend to register.",
       };
     } catch (error) {
       return {
@@ -80,7 +67,7 @@ export class SuiService {
 
   /**
    * Store song metadata on Sui blockchain
-   * This will call the SongRegistry.move smart contract
+   * This should be called AFTER uploading audio to Walrus
    */
   async storeSongMetadata(params: {
     title: string;
@@ -91,6 +78,7 @@ export class SuiService {
     duration: number;
     genre?: string;
     coverImage?: string;
+    signerAddress: string; // The wallet address that will sign this transaction
   }): Promise<{
     success: boolean;
     songId?: string;
@@ -99,36 +87,91 @@ export class SuiService {
   }> {
     try {
       if (!this.packageId || !this.songRegistryId) {
-        throw new Error(
-          "Smart contracts not deployed yet. Using in-memory storage."
-        );
+        throw new Error("Smart contracts not configured. Check .env file.");
       }
 
-      // TODO: Create transaction to call smart contract
-      // const tx = new TransactionBlock();
-      // tx.moveCall({
-      //   target: `${this.packageId}::song_registry::register_song`,
-      //   arguments: [
-      //     tx.object(this.songRegistryId),
-      //     tx.pure(params.title),
-      //     tx.pure(params.artistId),
-      //     tx.pure(params.walrusBlobId),
-      //     tx.pure(params.pricePerPlay),
-      //     tx.pure(params.duration),
-      //     tx.pure(params.genre || ''),
-      //   ],
-      // });
+      console.log("⛓️ Creating transaction to register song on Sui...");
 
-      // For now, return pending status
+      // Create transaction to call register_song
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::song_registry::register_song`,
+        arguments: [
+          tx.object(this.songRegistryId),
+          tx.pure.string(params.title),
+          tx.pure.address(params.artistId),
+          tx.pure.string(params.artistName),
+          tx.pure.string(params.walrusBlobId),
+          tx.pure.u64(Math.floor(params.pricePerPlay * 1000000000)), // Convert to MIST
+          tx.pure.u64(params.duration),
+          tx.pure.string(params.genre || ""),
+          tx.pure.string(params.coverImage || ""),
+        ],
+      });
+
+      // For backend, we can't sign transactions
+      // Return the transaction for frontend to sign
+      const txBytes = await tx.build({ client: this.client });
+
       return {
         success: false,
-        error: "Smart contracts not yet deployed. Using in-memory storage.",
+        error:
+          "Transaction built. Frontend must sign and execute this transaction.",
       };
     } catch (error) {
+      console.error(
+        "❌ Failed to create song registration transaction:",
+        error
+      );
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       };
+    }
+  }
+
+  /**
+   * Get all songs from blockchain by querying SongRegistered events
+   */
+  async getAllSongs(): Promise<any[]> {
+    try {
+      if (!this.packageId) {
+        console.warn("⚠️ Smart contracts not configured");
+        return [];
+      }
+
+      console.log("⛓️ Querying all songs from Sui blockchain...");
+
+      // Query SongRegistered events
+      const events = await this.client.queryEvents({
+        query: {
+          MoveEventType: `${this.packageId}::song_registry::SongRegistered`,
+        },
+        limit: 50,
+        order: "descending",
+      });
+
+      console.log(`✅ Found ${events.data.length} songs on blockchain`);
+
+      return events.data.map((event) => {
+        const fields = event.parsedJson as any;
+        return {
+          id: fields.song_id,
+          title: fields.title,
+          artistId: fields.artist_id,
+          artistName: fields.artist_name,
+          walrusCID: fields.walrus_blob_id,
+          pricePerPlay: fields.price_per_play / 1000000000, // Convert from MIST
+          duration: fields.duration,
+          genre: fields.genre,
+          uploadedAt: fields.uploaded_at,
+          totalPlays: 0, // Would need to query the song object for this
+        };
+      });
+    } catch (error) {
+      console.error("❌ Failed to get songs from blockchain:", error);
+      return [];
     }
   }
 
@@ -138,66 +181,45 @@ export class SuiService {
   async getSongMetadata(songId: string): Promise<any> {
     try {
       if (!this.packageId) {
-        throw new Error("Smart contracts not deployed yet");
+        throw new Error("Smart contracts not configured");
       }
 
-      // TODO: Query blockchain for song data
-      // const result = await this.client.getObject({
-      //   id: songId,
-      //   options: { showContent: true },
-      // });
+      console.log(`⛓️ Querying song ${songId} from blockchain...`);
 
-      return null;
+      // Query the song object directly
+      const result = await this.client.getObject({
+        id: songId,
+        options: {
+          showContent: true,
+          showOwner: true,
+        },
+      });
+
+      if (
+        !result.data?.content ||
+        result.data.content.dataType !== "moveObject"
+      ) {
+        return null;
+      }
+
+      const fields = result.data.content.fields as any;
+
+      return {
+        id: songId,
+        title: fields.title,
+        artistId: fields.artist_id,
+        artistName: fields.artist_name,
+        walrusCID: fields.walrus_blob_id,
+        pricePerPlay: fields.price_per_play / 1000000000,
+        duration: fields.duration,
+        genre: fields.genre,
+        coverImage: fields.cover_image,
+        uploadedAt: fields.uploaded_at,
+        totalPlays: fields.total_plays,
+      };
     } catch (error) {
       console.error("Failed to get song metadata:", error);
       return null;
-    }
-  }
-
-  /**
-   * Get all songs from blockchain
-   */
-  async getAllSongs(): Promise<any[]> {
-    try {
-      if (!this.songRegistryId) {
-        throw new Error("Smart contracts not deployed yet");
-      }
-
-      // TODO: Query blockchain for all songs
-      // const result = await this.client.getDynamicFields({
-      //   parentId: this.songRegistryId,
-      // });
-
-      return [];
-    } catch (error) {
-      console.error("Failed to get songs:", error);
-      return [];
-    }
-  }
-
-  /**
-   * Record a song play on blockchain
-   * This will increment the play count and handle micropayments
-   */
-  async recordPlay(
-    songId: string,
-    listenerAddress: string
-  ): Promise<{ success: boolean; txDigest?: string }> {
-    try {
-      if (!this.packageId) {
-        throw new Error("Smart contracts not deployed yet");
-      }
-
-      // TODO: Create transaction for play event
-      // This should:
-      // 1. Increment play count
-      // 2. Transfer micropayment from listener to artist
-      // 3. Record play history
-
-      return { success: false };
-    } catch (error) {
-      console.error("Failed to record play:", error);
-      return { success: false };
     }
   }
 

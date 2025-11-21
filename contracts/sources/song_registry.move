@@ -2,11 +2,12 @@ module waltune::song_registry {
     use sui::object::{Self, UID};
     use sui::tx_context::{Self, TxContext};
     use sui::transfer;
+    use sui::event;
     use std::string::String;
 
     /// Song metadata stored on-chain
     /// The actual audio file is stored on Walrus, referenced by walrus_blob_id
-    struct Song has key, store {
+    public struct Song has key, store {
         id: UID,
         title: String,
         artist_id: address,
@@ -21,9 +22,22 @@ module waltune::song_registry {
     }
 
     /// Global registry of all songs
-    struct SongRegistry has key {
+    public struct SongRegistry has key {
         id: UID,
         total_songs: u64,
+    }
+
+    /// Event emitted when a new song is registered
+    public struct SongRegistered has copy, drop {
+        song_id: address,
+        title: String,
+        artist_id: address,
+        artist_name: String,
+        walrus_blob_id: String,
+        price_per_play: u64,
+        duration: u64,
+        genre: String,
+        uploaded_at: u64,
     }
 
     /// Initialize the song registry (call once at deployment)
@@ -52,8 +66,12 @@ module waltune::song_registry {
         let sender = tx_context::sender(ctx);
         assert!(sender == artist_id, 0); // Only artist can upload their songs
 
+        let song_uid = object::new(ctx);
+        let song_id = object::uid_to_address(&song_uid);
+        let uploaded_at = tx_context::epoch(ctx);
+
         let song = Song {
-            id: object::new(ctx),
+            id: song_uid,
             title,
             artist_id,
             artist_name,
@@ -63,15 +81,27 @@ module waltune::song_registry {
             genre,
             cover_image,
             total_plays: 0,
-            uploaded_at: tx_context::epoch(ctx),
+            uploaded_at,
         };
-
-        let song_address = object::uid_to_address(&song.id);
 
         registry.total_songs = registry.total_songs + 1;
 
-        // Transfer song object to artist
-        transfer::transfer(song, artist_id);
+        // Emit event so the song can be discovered
+        event::emit(SongRegistered {
+            song_id,
+            title: song.title,
+            artist_id: song.artist_id,
+            artist_name: song.artist_name,
+            walrus_blob_id: song.walrus_blob_id,
+            price_per_play: song.price_per_play,
+            duration: song.duration,
+            genre: song.genre,
+            uploaded_at: song.uploaded_at,
+        });
+
+        // 🔥 KEY CHANGE: Make song publicly accessible (like Spotify)
+        // Songs are now shared objects that everyone can read and play
+        transfer::share_object(song);
     }
 
     /// Record a play (increment play count)

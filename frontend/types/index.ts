@@ -14,14 +14,26 @@ export interface Song {
   title: string;
   artistId: string;
   artistName: string;
-  walrusCID: string;
+  walrusBlobId: string; // Walrus storage blob ID
   pricePerPlay: number;
   duration: number;
   genre?: string;
   coverImage?: string;
   uploadedAt: number;
   totalPlays: number;
-  streamUrl?: string;
+  streamUrl?: string; // Computed from walrusBlobId
+}
+
+// Sui Transaction Types
+export interface SuiSongData {
+  title: string;
+  artistId: string;
+  artistName: string;
+  walrusBlobId: string;
+  pricePerPlay: number;
+  duration: number;
+  genre: string;
+  coverImage: string;
 }
 
 // API Response

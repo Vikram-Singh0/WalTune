@@ -1,12 +1,14 @@
-import axios, { AxiosInstance } from "axios";
-import FormData from "form-data";
+import { walrus } from "@mysten/walrus";
+import { getFullnodeUrl, SuiClient } from "@mysten/sui/client";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { WalrusUploadResult } from "../types/index.js";
+import axios from "axios";
+import FormData from "form-data";
 
 export class WalrusClient {
   private publisherUrl: string;
   private aggregatorUrl: string;
   private epochs: number;
-  private axiosInstance: AxiosInstance;
 
   constructor() {
     this.publisherUrl =
@@ -16,51 +18,55 @@ export class WalrusClient {
       process.env.WALRUS_AGGREGATOR_URL ||
       "https://aggregator.walrus-testnet.walrus.space";
     this.epochs = parseInt(process.env.WALRUS_EPOCHS || "5", 10);
-
-    this.axiosInstance = axios.create({
-      timeout: 60000, // 60 seconds for large file uploads
-    });
   }
 
   /**
-   * Upload audio file to Walrus
+   * Upload audio file to Walrus using HTTP publisher endpoint
+   * This is the recommended approach for backend uploads without needing a wallet
    * @param buffer Audio file buffer
    * @param filename Original filename
-   * @returns Walrus upload result with blob ID and CID
+   * @returns Walrus upload result with blob ID
    */
   async uploadAudio(
     buffer: Buffer,
     filename: string
   ): Promise<WalrusUploadResult> {
     try {
-      const formData = new FormData();
-      formData.append("file", buffer, {
-        filename,
-        contentType: "audio/mpeg",
-      });
+      console.log(
+        `📤 Uploading ${filename} to Walrus (${buffer.length} bytes)`
+      );
 
-      const response = await this.axiosInstance.put(
+      // Use HTTP PUT request to Walrus publisher
+      const response = await axios.put(
         `${this.publisherUrl}/v1/store?epochs=${this.epochs}`,
-        formData,
+        buffer,
         {
           headers: {
-            ...formData.getHeaders(),
+            "Content-Type": "application/octet-stream",
           },
           maxBodyLength: Infinity,
           maxContentLength: Infinity,
+          timeout: 60000,
         }
       );
 
+      console.log("✅ Walrus upload successful:", response.data);
+
+      // The publisher returns the blob info
       return response.data as WalrusUploadResult;
     } catch (error) {
+      console.error("❌ Walrus upload failed:", error);
+      
       if (axios.isAxiosError(error)) {
-        throw new Error(
-          `Walrus upload failed: ${
-            error.response?.data?.message || error.message
-          }`
-        );
+        const errorMsg = error.response?.data?.message || error.message;
+        throw new Error(`Walrus publisher upload failed: ${errorMsg}`);
       }
-      throw error;
+      
+      throw new Error(
+        `Walrus upload failed: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -80,8 +86,10 @@ export class WalrusClient {
    */
   async checkBlobExists(blobId: string): Promise<boolean> {
     try {
-      const response = await this.axiosInstance.head(this.getAudioUrl(blobId));
-      return response.status === 200;
+      const response = await fetch(this.getAudioUrl(blobId), {
+        method: "HEAD",
+      });
+      return response.ok;
     } catch {
       return false;
     }
@@ -96,10 +104,12 @@ export class WalrusClient {
     blobId: string
   ): Promise<{ size: number; contentType: string }> {
     try {
-      const response = await this.axiosInstance.head(this.getAudioUrl(blobId));
+      const response = await fetch(this.getAudioUrl(blobId), {
+        method: "HEAD",
+      });
       return {
-        size: parseInt(response.headers["content-length"] || "0", 10),
-        contentType: response.headers["content-type"] || "audio/mpeg",
+        size: parseInt(response.headers.get("content-length") || "0", 10),
+        contentType: response.headers.get("content-type") || "audio/mpeg",
       };
     } catch (error) {
       throw new Error(`Failed to get blob metadata: ${error}`);

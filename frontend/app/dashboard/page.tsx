@@ -1,11 +1,20 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCurrentAccount } from "@mysten/dapp-kit";
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+  useSuiClient,
+} from "@mysten/dapp-kit";
 import { useRouter } from "next/navigation";
 import { Navbar } from "@/components/Navbar";
 import { api } from "@/lib/api";
 import { Artist, Song } from "@/types";
+import {
+  createRegisterArtistTx,
+  createRegisterSongTx,
+} from "@/lib/sui-transactions";
+import { WALRUS_PUBLISHER_URL, getWalrusStreamUrl } from "@/lib/sui-config";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic2,
@@ -19,12 +28,14 @@ import {
   FileAudio,
   DollarSign,
   Music2,
-  User
+  User,
 } from "lucide-react";
 
 export default function DashboardPage() {
   const account = useCurrentAccount();
   const router = useRouter();
+  const { mutate: signAndExecute } = useSignAndExecuteTransaction();
+  const client = useSuiClient();
   const [artist, setArtist] = useState<Artist | null>(null);
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,26 +68,92 @@ export default function DashboardPage() {
     if (!account) return;
 
     try {
-      const response = await api.getArtistByWallet(account.address);
-      if (response.success && response.data) {
-        setArtist(response.data);
-        loadSongs(response.data.id);
+      // Query artist objects owned by wallet from Sui blockchain
+      const ownedObjects = await client.getOwnedObjects({
+        owner: account.address,
+        options: {
+          showType: true,
+          showContent: true,
+        },
+      });
+
+      // Filter for Artist objects
+      const artistObjects = ownedObjects.data.filter((obj) =>
+        obj.data?.type?.includes("::artist::Artist")
+      );
+
+      if (artistObjects.length > 0) {
+        const artistObj = artistObjects[0];
+        const content = artistObj.data?.content as any;
+
+        if (content?.fields) {
+          setArtist({
+            id: artistObj.data?.objectId || "",
+            walletAddress: account.address,
+            name: content.fields.name,
+            bio: content.fields.bio || "",
+            createdAt: Number(content.fields.created_at) || 0,
+          });
+          loadSongs();
+        } else {
+          setShowRegister(true);
+        }
       } else {
         setShowRegister(true);
       }
     } catch (error) {
+      console.error("Failed to check artist:", error);
       setShowRegister(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const loadSongs = async (artistId: string) => {
+  const loadSongs = async () => {
+    if (!account) return;
+
     try {
-      const response = await api.getSongsByArtist(artistId);
-      if (response.success && response.data) {
-        setSongs(response.data);
-      }
+      // Query song objects owned by wallet from Sui blockchain
+      const ownedObjects = await client.getOwnedObjects({
+        owner: account.address,
+        options: {
+          showType: true,
+          showContent: true,
+        },
+      });
+
+      // Filter for Song objects
+      const songObjects = ownedObjects.data.filter((obj) =>
+        obj.data?.type?.includes("::song_registry::Song")
+      );
+
+      // Parse song data from blockchain
+      const parsedSongs = songObjects
+        .map((obj) => {
+          const content = obj.data?.content as any;
+          if (content?.fields) {
+            return {
+              id: obj.data?.objectId || "",
+              title: content.fields.title,
+              artistId: content.fields.artist_id,
+              artistName: content.fields.artist_name,
+              walrusBlobId: content.fields.walrus_blob_id,
+              pricePerPlay:
+                Number(content.fields.price_per_play) / 1_000_000_000, // Convert MIST to SUI
+              duration: Number(content.fields.duration),
+              genre: content.fields.genre || "Unknown",
+              coverImage: content.fields.cover_image || "",
+              totalPlays: Number(content.fields.total_plays) || 0,
+              uploadedAt: Number(content.fields.uploaded_at) || 0,
+              streamUrl: getWalrusStreamUrl(content.fields.walrus_blob_id),
+            } as Song;
+          }
+          return null;
+        })
+        .filter((song): song is Song => song !== null) as Song[];
+
+      setSongs(parsedSongs);
+      console.log("✅ Loaded songs from Sui:", parsedSongs);
     } catch (error) {
       console.error("Failed to load songs:", error);
     }
@@ -87,21 +164,34 @@ export default function DashboardPage() {
     if (!account) return;
 
     try {
-      const response = await api.registerArtist({
-        walletAddress: account.address,
+      console.log("🔐 Creating artist registration transaction...");
+
+      // Create Sui blockchain transaction
+      const tx = createRegisterArtistTx({
         name: artistName,
-        bio: bio || undefined,
+        bio: bio || "",
       });
 
-      if (response.success && response.data) {
-        setArtist(response.data);
-        setShowRegister(false);
-      } else {
-        alert("Registration failed: " + response.error);
-      }
+      // Sign and execute transaction
+      signAndExecute(
+        { transaction: tx },
+        {
+          onSuccess: (result) => {
+            console.log("✅ Artist registered on Sui blockchain:", result);
+            alert("Artist registered successfully on blockchain!");
+            setShowRegister(false);
+            // Refresh to load artist data
+            checkArtist();
+          },
+          onError: (error) => {
+            console.error("❌ Registration failed:", error);
+            alert("Registration failed: " + error.message);
+          },
+        }
+      );
     } catch (error) {
-      alert("Registration failed");
-      console.error(error);
+      console.error("Transaction creation failed:", error);
+      alert("Failed to create transaction");
     }
   };
 
@@ -137,33 +227,81 @@ export default function DashboardPage() {
 
     setUploading(true);
     try {
+      console.log("📤 Step 1: Uploading audio to Walrus via backend...");
+      console.log(
+        "File size:",
+        (uploadForm.file.size / 1024 / 1024).toFixed(2),
+        "MB"
+      );
+
+      // Step 1: Upload audio file to Walrus via backend proxy (to avoid CORS)
       const formData = new FormData();
       formData.append("file", uploadForm.file);
-      formData.append("title", uploadForm.title);
-      formData.append("artistWallet", account.address);
-      formData.append("pricePerPlay", uploadForm.pricePerPlay);
-      formData.append("duration", uploadForm.duration.toString());
-      if (uploadForm.genre) formData.append("genre", uploadForm.genre);
 
-      const response = await api.uploadSong(formData);
+      const backendResponse = await fetch(
+        "http://localhost:3001/api/walrus/upload",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
-      if (response.success && response.data) {
-        alert("Song uploaded successfully!");
-        setSongs([response.data, ...songs]);
-        setShowUpload(false);
-        setUploadForm({
-          title: "",
-          file: null,
-          pricePerPlay: "0.01",
-          duration: 0,
-          genre: "",
-        });
-      } else {
-        alert("Upload failed: " + response.error);
+      if (!backendResponse.ok) {
+        const errorData = await backendResponse.json();
+        console.error("Backend upload error:", errorData);
+        throw new Error(errorData.error || "Backend upload failed");
       }
+
+      const { blobId } = await backendResponse.json();
+
+      if (!blobId) {
+        throw new Error("No blob ID returned from backend");
+      }
+
+      console.log("✅ Uploaded to Walrus, blob ID:", blobId);
+      console.log("🔐 Step 2: Registering song on Sui blockchain...");
+
+      // Step 2: Register song metadata on Sui blockchain with Walrus blob ID
+      const tx = createRegisterSongTx({
+        title: uploadForm.title,
+        artistId: account.address,
+        artistName: artist.name,
+        walrusBlobId: blobId, // Link to Walrus storage
+        pricePerPlay: parseFloat(uploadForm.pricePerPlay),
+        duration: uploadForm.duration,
+        genre: uploadForm.genre || "Unknown",
+        coverImage: "",
+      });
+
+      signAndExecute(
+        { transaction: tx },
+        {
+          onSuccess: (result) => {
+            console.log("✅ Song registered on Sui blockchain:", result);
+            console.log("🎵 Stream URL:", getWalrusStreamUrl(blobId));
+            alert(
+              "Song uploaded successfully! Audio on Walrus, metadata on Sui."
+            );
+            setShowUpload(false);
+            setUploadForm({
+              title: "",
+              file: null,
+              pricePerPlay: "0.01",
+              duration: 0,
+              genre: "",
+            });
+            // Refresh songs list
+            loadSongs();
+          },
+          onError: (error) => {
+            console.error("❌ Song registration failed:", error);
+            alert("Failed to register song on blockchain: " + error.message);
+          },
+        }
+      );
     } catch (error) {
-      alert("Upload failed");
-      console.error(error);
+      console.error("Upload failed:", error);
+      alert("Upload failed: " + error);
     } finally {
       setUploading(false);
     }
@@ -195,9 +333,7 @@ export default function DashboardPage() {
               <div className="w-20 h-20 bg-[#4ade80]/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Mic2 className="w-10 h-10 text-[#4ade80]" />
               </div>
-              <h1 className="text-3xl font-bold mb-3">
-                Become an Artist
-              </h1>
+              <h1 className="text-3xl font-bold mb-3">Become an Artist</h1>
               <p className="text-gray-400">
                 Register to start uploading your music to WalTune
               </p>
@@ -264,9 +400,7 @@ export default function DashboardPage() {
               <Mic2 className="w-12 h-12 text-[#4ade80]" />
             </div>
             <div className="flex-1 text-center md:text-left">
-              <h1 className="text-4xl font-bold mb-2">
-                {artist?.name}
-              </h1>
+              <h1 className="text-4xl font-bold mb-2">{artist?.name}</h1>
               {artist?.bio && (
                 <p className="text-gray-400 mb-4 max-w-2xl">{artist.bio}</p>
               )}
@@ -287,9 +421,29 @@ export default function DashboardPage() {
         {/* Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
           {[
-            { label: "Total Songs", value: songs.length, icon: <Music className="w-6 h-6 text-blue-400" />, color: "bg-blue-500/10" },
-            { label: "Total Plays", value: songs.reduce((acc, song) => acc + song.totalPlays, 0), icon: <PlayCircle className="w-6 h-6 text-[#4ade80]" />, color: "bg-[#4ade80]/10" },
-            { label: "Total Earnings (SUI)", value: songs.reduce((acc, song) => acc + song.totalPlays * song.pricePerPlay, 0).toFixed(4), icon: <DollarSign className="w-6 h-6 text-purple-400" />, color: "bg-purple-500/10" }
+            {
+              label: "Total Songs",
+              value: songs.length,
+              icon: <Music className="w-6 h-6 text-blue-400" />,
+              color: "bg-blue-500/10",
+            },
+            {
+              label: "Total Plays",
+              value: songs.reduce((acc, song) => acc + song.totalPlays, 0),
+              icon: <PlayCircle className="w-6 h-6 text-[#4ade80]" />,
+              color: "bg-[#4ade80]/10",
+            },
+            {
+              label: "Total Earnings (SUI)",
+              value: songs
+                .reduce(
+                  (acc, song) => acc + song.totalPlays * song.pricePerPlay,
+                  0
+                )
+                .toFixed(4),
+              icon: <DollarSign className="w-6 h-6 text-purple-400" />,
+              color: "bg-purple-500/10",
+            },
           ].map((stat, i) => (
             <motion.div
               key={i}
@@ -298,7 +452,9 @@ export default function DashboardPage() {
               transition={{ delay: i * 0.1 }}
               className="bg-white/5 border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors"
             >
-              <div className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center mb-4`}>
+              <div
+                className={`w-12 h-12 ${stat.color} rounded-xl flex items-center justify-center mb-4`}
+              >
                 {stat.icon}
               </div>
               <div className="text-3xl font-bold mb-1">{stat.value}</div>
@@ -323,9 +479,7 @@ export default function DashboardPage() {
               <div className="w-20 h-20 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Music className="w-10 h-10 text-gray-600" />
               </div>
-              <h3 className="text-xl font-bold mb-2">
-                No songs yet
-              </h3>
+              <h3 className="text-xl font-bold mb-2">No songs yet</h3>
               <p className="text-gray-500 mb-8">
                 Upload your first song to start earning
               </p>
@@ -358,7 +512,10 @@ export default function DashboardPage() {
                         {song.genre || "Unknown Genre"}
                       </span>
                       <span>•</span>
-                      <span>{Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, '0')}</span>
+                      <span>
+                        {Math.floor(song.duration / 60)}:
+                        {(song.duration % 60).toString().padStart(2, "0")}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right flex items-center gap-8">
@@ -402,7 +559,8 @@ export default function DashboardPage() {
               <div className="p-8">
                 <div className="flex items-center justify-between mb-8">
                   <h2 className="text-2xl font-bold flex items-center gap-3">
-                    <Upload className="w-6 h-6 text-[#4ade80]" /> Upload New Song
+                    <Upload className="w-6 h-6 text-[#4ade80]" /> Upload New
+                    Song
                   </h2>
                   <button
                     onClick={() => setShowUpload(false)}
@@ -445,16 +603,26 @@ export default function DashboardPage() {
                         {uploadForm.file ? (
                           <div className="flex items-center justify-center gap-3 text-[#4ade80]">
                             <FileAudio className="w-6 h-6" />
-                            <span className="font-medium">{uploadForm.file.name}</span>
+                            <span className="font-medium">
+                              {uploadForm.file.name}
+                            </span>
                             <span className="text-sm text-gray-500">
-                              ({Math.round((uploadForm.file.size / 1024 / 1024) * 100) / 100} MB)
+                              (
+                              {Math.round(
+                                (uploadForm.file.size / 1024 / 1024) * 100
+                              ) / 100}{" "}
+                              MB)
                             </span>
                           </div>
                         ) : (
                           <div className="text-gray-400">
                             <Upload className="w-8 h-8 mx-auto mb-3 text-gray-600 group-hover:text-[#4ade80] transition-colors" />
-                            <p className="font-medium">Click to upload or drag and drop</p>
-                            <p className="text-sm text-gray-600 mt-1">MP3 files only</p>
+                            <p className="font-medium">
+                              Click to upload or drag and drop
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              MP3 files only
+                            </p>
                           </div>
                         )}
                       </div>
@@ -493,7 +661,10 @@ export default function DashboardPage() {
                         type="text"
                         value={uploadForm.genre}
                         onChange={(e) =>
-                          setUploadForm({ ...uploadForm, genre: e.target.value })
+                          setUploadForm({
+                            ...uploadForm,
+                            genre: e.target.value,
+                          })
                         }
                         className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-white placeholder:text-gray-600 focus:outline-none focus:border-[#4ade80]/50 focus:ring-1 focus:ring-[#4ade80]/50 transition-all"
                         placeholder="e.g., Pop, Rock"
@@ -508,7 +679,8 @@ export default function DashboardPage() {
                   >
                     {uploading ? (
                       <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin" /> Uploading...
+                        <Loader2 className="w-5 h-5 animate-spin" />{" "}
+                        Uploading...
                       </span>
                     ) : (
                       "Upload Song"

@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSuiClient } from "@mysten/dapp-kit";
 import { Navbar } from "@/components/Navbar";
 import { SongCard } from "@/components/SongCard";
 import { MusicPlayer } from "@/components/MusicPlayer";
 import { Song } from "@/types";
-import { api } from "@/lib/api";
+import { getWalrusStreamUrl } from "@/lib/sui-config";
 
 export default function ExplorePage() {
+  const suiClient = useSuiClient();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -16,29 +18,65 @@ export default function ExplorePage() {
 
   useEffect(() => {
     loadSongs();
-  }, []);
+  }, []); // Remove account dependency since we're using events now
 
   const loadSongs = async () => {
     try {
-      const response = await api.getAllSongs();
-      if (response.success && response.data) {
-        setSongs(response.data);
-      }
+      console.log("🔍 Loading all songs from Sui blockchain events...");
+
+      const packageId =
+        "0x5e49fc9853d27dff034b58f0dbbed0a6f53ce10c77a19cc157fcc1b0163024f1";
+
+      // Query SongRegistered events to get all songs
+      const events = await suiClient.queryEvents({
+        query: {
+          MoveEventType: `${packageId}::song_registry::SongRegistered`,
+        },
+        limit: 50, // Get up to 50 songs
+        order: "descending", // Newest first
+      });
+
+      console.log("📝 Found events:", events.data.length);
+
+      // Parse events to get song data
+      const parsedSongs: Song[] = events.data
+        .map((event: any) => {
+          const fields = event.parsedJson;
+          if (fields) {
+            return {
+              id: fields.song_id,
+              title: fields.title,
+              artistId: fields.artist_id,
+              artistName: fields.artist_name,
+              walrusBlobId: fields.walrus_blob_id,
+              pricePerPlay: Number(fields.price_per_play) / 1_000_000_000,
+              duration: Number(fields.duration),
+              genre: fields.genre || "Unknown",
+              coverImage: "",
+              totalPlays: 0,
+              uploadedAt: Number(fields.uploaded_at) || 0,
+              streamUrl: getWalrusStreamUrl(fields.walrus_blob_id),
+            };
+          }
+          return null;
+        })
+        .filter((song): song is Song => song !== null);
+
+      console.log("✅ Loaded songs from events:", parsedSongs);
+      setSongs(parsedSongs);
     } catch (error) {
-      console.error("Failed to load songs:", error);
+      console.error("❌ Failed to load songs:", error);
+      setSongs([]);
     } finally {
       setLoading(false);
     }
   };
 
   const handlePlay = async (song: Song) => {
+    console.log("▶️ Playing song:", song.title);
+    console.log("🎵 Walrus blob ID:", song.walrusBlobId);
+    console.log("🎵 Stream URL:", getWalrusStreamUrl(song.walrusBlobId));
     setCurrentSong(song);
-    // Record play
-    try {
-      await api.recordPlay(song.id);
-    } catch (error) {
-      console.error("Failed to record play:", error);
-    }
   };
 
   const filteredSongs = songs.filter((song) => {
@@ -61,9 +99,7 @@ export default function ExplorePage() {
       <main className="container mx-auto px-6 pt-32 pb-16">
         {/* Header Section */}
         <div className="mb-12">
-          <h1 className="text-5xl font-bold mb-4">
-            Explore Music
-          </h1>
+          <h1 className="text-5xl font-bold mb-4">Explore Music</h1>
           <p className="text-gray-400 text-lg">
             Discover decentralized music from artists worldwide
           </p>

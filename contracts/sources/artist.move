@@ -5,7 +5,7 @@ module waltune::artist {
     use std::string::String;
 
     /// Artist profile stored on-chain
-    struct Artist has key, store {
+    public struct Artist has key, store {
         id: UID,
         wallet_address: address,
         name: String,
@@ -16,7 +16,7 @@ module waltune::artist {
     }
 
     /// Global registry of all artists
-    struct ArtistRegistry has key {
+    public struct ArtistRegistry has key {
         id: UID,
         total_artists: u64,
     }

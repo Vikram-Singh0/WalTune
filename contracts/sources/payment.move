@@ -12,7 +12,6 @@ module waltune::payment {
         payment: Coin<SUI>,
         ctx: &mut TxContext
     ) {
-        let listener = tx_context::sender(ctx);
         let price = song_registry::get_price_per_play(song);
         
         // Verify payment amount
@@ -32,7 +31,7 @@ module waltune::payment {
     /// Split payment for future revenue sharing
     /// (e.g., platform fee, artist share)
     public fun split_payment(
-        payment: Coin<SUI>,
+        mut payment: Coin<SUI>,
         artist_share_percentage: u64,
         artist_address: address,
         platform_address: address,
@@ -40,7 +39,6 @@ module waltune::payment {
     ) {
         let total_amount = coin::value(&payment);
         let artist_amount = (total_amount * artist_share_percentage) / 100;
-        let platform_amount = total_amount - artist_amount;
 
         // Split the coin
         let artist_coin = coin::split(&mut payment, artist_amount, ctx);

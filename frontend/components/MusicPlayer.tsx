@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Song } from "@/types";
+import { getWalrusStreamUrl } from "@/lib/sui-config";
 
 interface MusicPlayerProps {
   song: Song;
@@ -15,6 +16,9 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
   const [volume, setVolume] = useState(1);
   const audioRef = useRef<HTMLAudioElement>(null);
 
+  // Get stream URL from Walrus blob ID
+  const streamUrl = song.streamUrl || getWalrusStreamUrl(song.walrusBlobId);
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -27,7 +31,10 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
     audio.addEventListener("ended", () => setIsPlaying(false));
 
     // Auto play when component mounts
-    audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
+    audio
+      .play()
+      .then(() => setIsPlaying(true))
+      .catch(() => setIsPlaying(false));
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
@@ -71,7 +78,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-white/10 shadow-2xl z-50 text-white">
-      <audio ref={audioRef} src={song.streamUrl} />
+      <audio ref={audioRef} src={streamUrl} />
 
       <div className="container mx-auto px-4 py-4">
         {/* Progress Bar */}
@@ -105,7 +112,9 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-bold text-sm truncate text-white">{song.title}</p>
+              <p className="font-bold text-sm truncate text-white">
+                {song.title}
+              </p>
               <p className="text-xs text-gray-400 truncate">
                 {song.artistName}
               </p>
@@ -115,7 +124,9 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
           {/* Controls */}
           <div className="flex items-center gap-6">
             <button className="text-gray-400 hover:text-white transition-colors">
-              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07l-1.41-1.41a3 3 0 000-4.24l1.41-1.41z" /></svg>
+              <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07l-1.41-1.41a3 3 0 000-4.24l1.41-1.41z" />
+              </svg>
             </button>
 
             <button

@@ -3,6 +3,7 @@ import { MultipartFile } from "@fastify/multipart";
 import { uploadAudio, getAudioStreamUrl } from "../walrus/uploadAudio.js";
 import { metadataStore } from "../walrus/metadataHandler.js";
 import { artistStore } from "../services/artistService.js";
+import { suiService } from "../sui/suiService.js";
 import { Song, ApiResponse } from "../types/index.js";
 
 interface UploadSongBody {
@@ -36,11 +37,14 @@ export class SongController {
 
       // Get form fields
       const fields = data.fields as any;
-      
+
       // Debug logging
       console.log("📝 Received fields:", JSON.stringify(fields, null, 2));
-      console.log("📝 File info:", { filename: data.filename, mimetype: data.mimetype });
-      
+      console.log("📝 File info:", {
+        filename: data.filename,
+        mimetype: data.mimetype,
+      });
+
       const title = fields.title?.value;
       const artistWallet = fields.artistWallet?.value;
       const pricePerPlay = parseFloat(fields.pricePerPlay?.value || "0");
@@ -127,7 +131,20 @@ export class SongController {
     reply: FastifyReply
   ): Promise<ApiResponse<Song[]>> {
     try {
-      const songs = metadataStore.getAllSongs();
+      // First try to get songs from blockchain
+      const blockchainSongs = await suiService.getAllSongs();
+
+      let songs: Song[];
+
+      if (blockchainSongs.length > 0) {
+        console.log(
+          `✅ Retrieved ${blockchainSongs.length} songs from blockchain`
+        );
+        songs = blockchainSongs;
+      } else {
+        console.log("📦 Using in-memory storage (no blockchain songs found)");
+        songs = metadataStore.getAllSongs();
+      }
 
       // Add streaming URLs
       const songsWithUrls = songs.map((song) => ({
@@ -160,7 +177,13 @@ export class SongController {
     try {
       const { id } = request.params;
 
-      const song = metadataStore.getSong(id);
+      // Try blockchain first
+      let song = await suiService.getSongMetadata(id);
+
+      // Fallback to in-memory storage
+      if (!song) {
+        song = metadataStore.getSong(id);
+      }
 
       if (!song) {
         reply.code(404);

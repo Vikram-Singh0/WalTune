@@ -4,6 +4,7 @@ import multipart from "@fastify/multipart";
 import dotenv from "dotenv";
 import artistRoutes from "./routes/artist.routes.js";
 import songRoutes from "./routes/song.routes.js";
+import walrusRoutes from "./routes/walrus.routes.js";
 
 dotenv.config();
 
@@ -37,6 +38,7 @@ async function registerPlugins() {
 async function registerRoutes() {
   await fastify.register(artistRoutes, { prefix: "/api/artist" });
   await fastify.register(songRoutes, { prefix: "/api/song" });
+  await fastify.register(walrusRoutes, { prefix: "/api/walrus" });
 }
 
 // Health check
