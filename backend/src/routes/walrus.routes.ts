@@ -10,18 +10,7 @@ const walrusRoutes: FastifyPluginAsync = async (fastify) => {
       error: "Endpoint deprecated",
       message:
         "Please use Walrus SDK directly from frontend. See frontend/lib/walrus-utils.ts",
-          blobId: mockBlobId,
-          isMock: true,
-          message: "Using mock blob ID - Walrus network error",
-        };
-      }
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      return reply.code(500).send({
-        error: "Upload failed",
-        message: error.message,
-      });
-    }
+    });
   });
 };
 
