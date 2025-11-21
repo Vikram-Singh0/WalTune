@@ -14,7 +14,7 @@ import {
   createRegisterArtistTx,
   createRegisterSongTx,
 } from "@/lib/sui-transactions";
-import { WALRUS_PUBLISHER_URL, getWalrusStreamUrl } from "@/lib/sui-config";
+import { WALRUS_PUBLISHER_URL, getWalrusStreamUrl, PACKAGE_ID } from "@/lib/sui-config";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic2,
@@ -113,39 +113,39 @@ export default function DashboardPage() {
     if (!account) return;
 
     try {
-      // Query song objects owned by wallet from Sui blockchain
-      const ownedObjects = await client.getOwnedObjects({
-        owner: account.address,
-        options: {
-          showType: true,
-          showContent: true,
+      console.log("🔍 Loading songs from Sui blockchain events...");
+      console.log("📦 Using Package ID:", PACKAGE_ID);
+      console.log("👤 Artist address:", account.address);
+
+      // Query SongRegistered events to get all songs by this artist
+      const events = await client.queryEvents({
+        query: {
+          MoveEventType: `${PACKAGE_ID}::song_registry::SongRegistered`,
         },
+        limit: 50,
+        order: "descending",
       });
 
-      // Filter for Song objects
-      const songObjects = ownedObjects.data.filter((obj) =>
-        obj.data?.type?.includes("::song_registry::Song")
-      );
+      console.log("📝 Found total events:", events.data.length);
 
-      // Parse song data from blockchain
-      const parsedSongs = songObjects
-        .map((obj) => {
-          const content = obj.data?.content as any;
-          if (content?.fields) {
+      // Filter for songs by this artist and parse
+      const parsedSongs = events.data
+        .map((event: any) => {
+          const fields = event.parsedJson;
+          if (fields && fields.artist_id === account.address) {
             return {
-              id: obj.data?.objectId || "",
-              title: content.fields.title,
-              artistId: content.fields.artist_id,
-              artistName: content.fields.artist_name,
-              walrusBlobId: content.fields.walrus_blob_id,
-              pricePerPlay:
-                Number(content.fields.price_per_play) / 1_000_000_000, // Convert MIST to SUI
-              duration: Number(content.fields.duration),
-              genre: content.fields.genre || "Unknown",
-              coverImage: content.fields.cover_image || "",
-              totalPlays: Number(content.fields.total_plays) || 0,
-              uploadedAt: Number(content.fields.uploaded_at) || 0,
-              streamUrl: getWalrusStreamUrl(content.fields.walrus_blob_id),
+              id: fields.song_id,
+              title: fields.title,
+              artistId: fields.artist_id,
+              artistName: fields.artist_name,
+              walrusBlobId: fields.walrus_blob_id,
+              pricePerPlay: Number(fields.price_per_play) / 1_000_000_000,
+              duration: Number(fields.duration),
+              genre: fields.genre || "Unknown",
+              coverImage: "",
+              totalPlays: 0,
+              uploadedAt: Number(fields.uploaded_at) || 0,
+              streamUrl: getWalrusStreamUrl(fields.walrus_blob_id),
             } as Song;
           }
           return null;
@@ -153,7 +153,7 @@ export default function DashboardPage() {
         .filter((song): song is Song => song !== null) as Song[];
 
       setSongs(parsedSongs);
-      console.log("✅ Loaded songs from Sui:", parsedSongs);
+      console.log("✅ Loaded your songs:", parsedSongs);
     } catch (error) {
       console.error("Failed to load songs:", error);
     }

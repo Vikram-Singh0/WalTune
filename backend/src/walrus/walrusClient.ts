@@ -36,24 +36,43 @@ export class WalrusClient {
         `📤 Uploading ${filename} to Walrus (${buffer.length} bytes)`
       );
 
-      // Use HTTP PUT request to Walrus publisher
-      const response = await axios.put(
-        `${this.publisherUrl}/v1/store?epochs=${this.epochs}`,
-        buffer,
-        {
-          headers: {
-            "Content-Type": "application/octet-stream",
-          },
-          maxBodyLength: Infinity,
-          maxContentLength: Infinity,
-          timeout: 60000,
+      // Try multiple publisher endpoints (in case one is down)
+      const publisherUrls = [
+        this.publisherUrl,
+        "https://publisher-devnet.walrus.space",
+        "https://wal-publisher-testnet.staketab.org",
+      ];
+
+      let lastError: Error | null = null;
+
+      for (const publisherUrl of publisherUrls) {
+        try {
+          console.log(`🔄 Trying publisher: ${publisherUrl}`);
+          
+          const response = await axios.put(
+            `${publisherUrl}/v1/store?epochs=${this.epochs}`,
+            buffer,
+            {
+              headers: {
+                "Content-Type": "application/octet-stream",
+              },
+              maxBodyLength: Infinity,
+              maxContentLength: Infinity,
+              timeout: 30000, // 30 seconds
+            }
+          );
+
+          console.log("✅ Walrus upload successful via:", publisherUrl);
+          return response.data as WalrusUploadResult;
+        } catch (error) {
+          lastError = error as Error;
+          console.warn(`⚠️ Failed with ${publisherUrl}:`, (error as Error).message);
+          continue; // Try next endpoint
         }
-      );
+      }
 
-      console.log("✅ Walrus upload successful:", response.data);
-
-      // The publisher returns the blob info
-      return response.data as WalrusUploadResult;
+      // All endpoints failed - throw the last error
+      throw lastError || new Error("All Walrus publisher endpoints failed");
     } catch (error) {
       console.error("❌ Walrus upload failed:", error);
       

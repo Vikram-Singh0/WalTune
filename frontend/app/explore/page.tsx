@@ -25,7 +25,8 @@ export default function ExplorePage() {
       console.log("🔍 Loading all songs from Sui blockchain events...");
 
       const packageId =
-        "0x5e49fc9853d27dff034b58f0dbbed0a6f53ce10c77a19cc157fcc1b0163024f1";
+        process.env.NEXT_PUBLIC_PACKAGE_ID ||
+        "0xdfbb5fec49706467dab0d239f74a0e490a8f90f7d9f4bb2a64059dc29be850d6";
 
       // Query SongRegistered events to get all songs
       const events = await suiClient.queryEvents({
