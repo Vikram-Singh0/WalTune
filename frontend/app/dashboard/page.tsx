@@ -15,7 +15,6 @@ import {
   createRegisterSongTx,
 } from "@/lib/sui-transactions";
 import {
-  WALRUS_PUBLISHER_URL,
   getWalrusStreamUrl,
   PACKAGE_ID,
 } from "@/lib/sui-config";

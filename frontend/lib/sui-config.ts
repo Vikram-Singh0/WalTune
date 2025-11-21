@@ -27,10 +27,8 @@ export const SONG_REGISTRY_ID =
   process.env.NEXT_PUBLIC_SONG_REGISTRY_ID ||
   "0x582682f484e8a8a0ec83ffc63d2c1215eb196e3d7db879254b97ab9181069da5";
 
-// Walrus Configuration
-export const WALRUS_PUBLISHER_URL =
-  process.env.NEXT_PUBLIC_WALRUS_PUBLISHER_URL ||
-  "https://publisher.walrus-testnet.walrus.space";
+// Walrus Configuration (Aggregator only - for streaming blobs)
+// Note: Uploads are done using Walrus SDK (see lib/walrus-utils.ts)
 export const WALRUS_AGGREGATOR_URL =
   process.env.NEXT_PUBLIC_WALRUS_AGGREGATOR_URL ||
   "https://aggregator.walrus-testnet.walrus.space";
