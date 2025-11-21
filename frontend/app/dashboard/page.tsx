@@ -241,8 +241,9 @@ export default function DashboardPage() {
       const formData = new FormData();
       formData.append("file", uploadForm.file);
 
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
       const backendResponse = await fetch(
-        "http://localhost:3001/api/walrus/upload",
+        `${API_URL}/api/walrus/upload`,
         {
           method: "POST",
           body: formData,

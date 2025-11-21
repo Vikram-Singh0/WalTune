@@ -17,7 +17,7 @@ import {
   createRegisterArtistTx,
   createRegisterSongTx,
 } from "@/lib/sui-transactions";
-import { WALRUS_PUBLISHER_URL } from "@/lib/sui-config";
+import { WALRUS_AGGREGATOR_URL } from "@/lib/sui-config";
 
 export default function ExampleDashboardWithSui() {
   const account = useCurrentAccount();
@@ -81,29 +81,15 @@ export default function ExampleDashboardWithSui() {
     setUploading(true);
     try {
       // Step 1: Upload audio file to Walrus
+      // Note: In production, use Walrus SDK (see lib/walrus-utils.ts and dashboard/page.tsx)
       console.log("📤 Uploading to Walrus...");
       const formData = new FormData();
       formData.append("file", file);
 
-      const walrusResponse = await fetch(`${WALRUS_PUBLISHER_URL}/v1/store`, {
-        method: "PUT",
-        body: file,
-      });
-
-      if (!walrusResponse.ok) {
-        throw new Error("Walrus upload failed");
-      }
-
-      const walrusData = await walrusResponse.json();
-      const blobId =
-        walrusData.newlyCreated?.blobObject?.blobId ||
-        walrusData.alreadyCertified?.blobId;
-
-      if (!blobId) {
-        throw new Error("No blob ID returned from Walrus");
-      }
-
-      console.log("✅ Uploaded to Walrus, blob ID:", blobId);
+      // For this example, we'll use a mock blob ID
+      // In production, use the Walrus SDK or backend proxy
+      const blobId = "example_blob_id_" + Date.now();
+      console.log("✅ Mock upload to Walrus, blob ID:", blobId);
 
       // Step 2: Register song on Sui blockchain with Walrus blob ID
       console.log("📝 Registering song on Sui blockchain...");
