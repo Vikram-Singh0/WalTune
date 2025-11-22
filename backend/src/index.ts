@@ -19,9 +19,21 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 // Register plugins
 async function registerPlugins() {
-  // CORS
+  // CORS - allow multiple origins properly
+  const allowedOrigins = [
+    "http://localhost:3000",
+    "https://waltune.vercel.app",
+    process.env.FRONTEND_URL,
+  ].filter(Boolean);
+
   await fastify.register(cors, {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, cb) => {
+      if (!origin || allowedOrigins.some(allowed => origin.includes(allowed))) {
+        cb(null, true);
+      } else {
+        cb(new Error("Not allowed by CORS"), false);
+      }
+    },
     credentials: true,
   });
 

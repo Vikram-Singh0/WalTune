@@ -1,120 +1,125 @@
 /**
  * Walrus Upload Utilities
- * Helper functions for uploading files to Walrus storage using the SDK
+ * Using Walrus SDK with wallet integration (HTTP upload not available on testnet)
  */
 
-import { SuiClient, getFullnodeUrl } from '@mysten/sui/client';
-import { WalrusClient, WalrusFile } from '@mysten/walrus';
+import { WalrusClient, WalrusFile } from "@mysten/walrus";
+import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
+import type { Signer } from "@mysten/sui/cryptography";
 
 /**
- * Initialize Walrus client
- */
-export function createWalrusClient(network: 'mainnet' | 'testnet' = 'testnet'): WalrusClient {
-  const suiClient = new SuiClient({
-    url: getFullnodeUrl(network),
-  });
-
-  return new WalrusClient({
-    suiClient,
-    network,
-  });
-}
-
-/**
- * Upload a file to Walrus using the SDK
- * This requires the user to have WAL tokens for storage fees
+ * Upload file to Walrus using SDK with user's wallet
+ * Note: HTTP upload endpoints are not available on testnet, so we must use SDK
+ * 
  * @param file File to upload
- * @param walletKeypair Keypair from the user's wallet (use with dApp kit)
- * @param epochs Number of epochs to store (default 5)
- * @returns Object with blobId and transaction digest
+ * @param signer User's wallet signer
+ * @param suiClient Sui client instance (optional, will create if not provided)
+ * @returns Blob ID
  */
 export async function uploadFileToWalrus(
   file: File,
-  walletKeypair: any, // Signer from @mysten/dapp-kit
-  epochs: number = 5
-): Promise<{ blobId: string; txDigest?: string }> {
-  const walrusClient = createWalrusClient('testnet');
+  signer: Signer,
+  suiClient?: SuiClient
+): Promise<{ blobId: string }> {
+  console.log(`📤 Uploading ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB) to Walrus...`);
 
-  // Read file as Uint8Array
-  const arrayBuffer = await file.arrayBuffer();
-  const blob = new Uint8Array(arrayBuffer);
+  try {
+    // Always create a fresh SuiClient with explicit RPC URL to avoid undefined URL issues
+    // The client from useSuiClient() might have an undefined URL
+    console.log("🔧 Creating SuiClient with testnet RPC...");
+    const rpcUrl = process.env.NEXT_PUBLIC_SUI_RPC_URL || getFullnodeUrl("testnet");
+    console.log(`   Using RPC: ${rpcUrl}`);
+    
+    const client = new SuiClient({
+      url: rpcUrl,
+    });
 
-  console.log(`📤 Uploading ${blob.length} bytes to Walrus...`);
-  console.log(`   Epochs: ${epochs}`);
-  
-  // Upload to Walrus
-  const result = await walrusClient.writeBlob({
-    blob,
-    deletable: true,
-    epochs,
-    signer: walletKeypair,
-  });
+    // Read file as Uint8Array
+    const arrayBuffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
 
-  console.log(`✅ Upload successful! Blob ID: ${result.blobId}`);
+    // Create Walrus client
+    console.log("🔧 Initializing Walrus client...");
+    const walrusClient = new WalrusClient({
+      client: client,
+      network: "testnet",
+    });
 
-  return {
-    blobId: result.blobId,
-    txDigest: result.blobObject.id.id,
-  };
-}
+    // Create WalrusFile
+    const walrusFile = WalrusFile.from({
+      contents: bytes,
+      identifier: file.name,
+      tags: {
+        contentType: file.type || "audio/mpeg",
+        originalName: file.name,
+      },
+    });
 
-/**
- * Upload multiple files as a Walrus File (with metadata)
- * Better for files that need metadata/tagging
- */
-export async function uploadFilesWithMetadata(
-  files: Array<{ file: File; identifier: string; tags?: Record<string, string> }>,
-  walletKeypair: any,
-  epochs: number = 5
-): Promise<{ blobId: string; files: any[] }> {
-  const walrusClient = createWalrusClient('testnet');
+    console.log("🔐 Uploading with your wallet (you'll need to approve the transaction)...");
 
-  // Convert to WalrusFile format
-  const walrusFiles = await Promise.all(
-    files.map(async ({ file, identifier, tags }) => {
-      const arrayBuffer = await file.arrayBuffer();
-      const contents = new Uint8Array(arrayBuffer);
-      
-      return WalrusFile.from({
-        contents,
-        identifier,
-        tags: tags || {
-          'content-type': file.type,
-          'file-name': file.name,
-        },
-      });
-    })
-  );
+    // Upload using user's wallet as signer
+    const results = await walrusClient.writeFiles({
+      files: [walrusFile],
+      signer,
+      epochs: 5,
+      deletable: false,
+    });
 
-  // Write files to Walrus
-  const results = await walrusClient.writeFiles({
-    files: walrusFiles,
-    epochs,
-    deletable: true,
-    signer: walletKeypair,
-  });
+    // writeFiles returns an array of results
+    if (!results || results.length === 0 || !results[0]?.blobId) {
+      throw new Error("No blob ID returned from Walrus");
+    }
 
-  return {
-    blobId: results[0].blobId,
-    files: results,
-  };
-}
-
-/**
- * Read/verify a blob from Walrus
- */
-export async function readBlobFromWalrus(blobId: string): Promise<Uint8Array> {
-  const walrusClient = createWalrusClient('testnet');
-  return await walrusClient.readBlob({ blobId });
+    const blobId = results[0].blobId;
+    console.log(`✅ Upload successful! Blob ID: ${blobId}`);
+    return { blobId };
+  } catch (error: any) {
+    console.error('❌ Walrus upload failed:', error);
+    
+    // Provide more descriptive error messages
+    let errorMessage = 'Walrus upload failed';
+    if (error.message) {
+      errorMessage = error.message;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    
+    // Check for specific error conditions
+    if (errorMessage.includes('404') || errorMessage.includes('Unexpected status code: 404')) {
+      errorMessage = 'Sui RPC error (404). This usually means:\n' +
+        '1. The Sui testnet RPC endpoint is having issues\n' +
+        '2. The Walrus SDK is trying to access objects that don\'t exist\n' +
+        '3. Network configuration mismatch\n\n' +
+        'Try:\n' +
+        '- Check your Sui network connection\n' +
+        '- Ensure you\'re on Sui testnet\n' +
+        '- Wait a moment and try again (RPC might be temporarily unavailable)';
+    } else if (errorMessage.includes('balance') || errorMessage.includes('insufficient')) {
+      errorMessage = 'Insufficient balance. You need:\n' +
+        '1. SUI tokens (for gas fees)\n' +
+        '2. WAL tokens (for storage fees)\n\n' +
+        'Get tokens from: https://docs.wal.app/usage/setup.html';
+    } else if (errorMessage.includes('network') || errorMessage.includes('connection')) {
+      errorMessage = 'Network error. Please check your connection and try again.';
+    } else if (errorMessage.includes('signature') || errorMessage.includes('sign')) {
+      errorMessage = 'Transaction signature failed. Please approve the transaction in your wallet.';
+    }
+    
+    throw new Error(errorMessage);
+  }
 }
 
 /**
  * Get Walrus aggregator URL for streaming
  */
-export function getWalrusAggregatorUrl(blobId: string, network: 'mainnet' | 'testnet' = 'testnet'): string {
-  const aggregatorUrl = network === 'testnet'
-    ? 'https://aggregator.walrus-testnet.walrus.space'
-    : 'https://aggregator.walrus.space';
-  
+export function getWalrusAggregatorUrl(
+  blobId: string,
+  network: 'mainnet' | 'testnet' = 'testnet'
+): string {
+  const aggregatorUrl =
+    network === 'testnet'
+      ? 'https://aggregator.walrus-testnet.walrus.space'
+      : 'https://aggregator.walrus.space';
+
   return `${aggregatorUrl}/v1/${blobId}`;
 }

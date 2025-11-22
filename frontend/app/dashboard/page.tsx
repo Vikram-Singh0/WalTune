@@ -230,36 +230,27 @@ export default function DashboardPage() {
 
     setUploading(true);
     try {
-      console.log("📤 Step 1: Uploading audio to Walrus via backend...");
+      console.log("📤 Step 1: Uploading audio to Walrus with your wallet...");
       console.log(
         "File size:",
         (uploadForm.file.size / 1024 / 1024).toFixed(2),
         "MB"
       );
 
-      // Step 1: Upload audio file to Walrus via backend proxy (to avoid CORS)
-      const formData = new FormData();
-      formData.append("file", uploadForm.file);
-
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
-      const backendResponse = await fetch(
-        `${API_URL}/api/walrus/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
+      // Import the upload function
+      const { uploadFileToWalrus } = await import("@/lib/walrus-utils");
+      
+      // Step 1: Upload to Walrus using SDK (HTTP upload not available on testnet)
+      // Note: This will prompt the user to sign a transaction
+      // Pass client (will be validated/created in uploadFileToWalrus if needed)
+      const { blobId } = await uploadFileToWalrus(
+        uploadForm.file,
+        account as any, // The SDK will handle the wallet signing
+        client // May be undefined, uploadFileToWalrus will create a new one if needed
       );
 
-      if (!backendResponse.ok) {
-        const errorData = await backendResponse.json();
-        console.error("Backend upload error:", errorData);
-        throw new Error(errorData.error || "Backend upload failed");
-      }
-
-      const { blobId } = await backendResponse.json();
-
       if (!blobId) {
-        throw new Error("No blob ID returned from backend");
+        throw new Error("No blob ID returned");
       }
 
       console.log("✅ Uploaded to Walrus, blob ID:", blobId);
@@ -303,9 +294,21 @@ export default function DashboardPage() {
           },
         }
       );
-    } catch (error) {
+    } catch (error: any) {
       console.error("Upload failed:", error);
-      alert("Upload failed: " + error);
+      
+      // Provide helpful error messages
+      if (error.message?.includes("Walrus CLI")) {
+        alert(
+          "❌ Upload failed: Walrus CLI error.\n\n" +
+          "The backend Walrus CLI may not be configured properly.\n" +
+          "Contact the administrator."
+        );
+      } else if (error.message?.includes("reject")) {
+        alert("Upload cancelled by user.");
+      } else {
+        alert("Upload failed: " + error.message);
+      }
     } finally {
       setUploading(false);
     }
@@ -575,6 +578,22 @@ export default function DashboardPage() {
                 </div>
 
                 <form onSubmit={handleUpload} className="space-y-6">
+                  {/* Walrus CLI Upload Notice */}
+                  <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="text-blue-400 text-lg mt-0.5">💡</div>
+                      <div className="flex-1 text-sm">
+                        <p className="text-blue-300 font-medium mb-1">
+                          Decentralized Storage via Walrus
+                        </p>
+                        <p className="text-blue-200/70">
+                          Your audio is uploaded using Walrus CLI for reliable, decentralized storage.
+                          Files are permanent and censorship-resistant.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
                       Song Title *

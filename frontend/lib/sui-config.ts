@@ -1,13 +1,21 @@
 import { getFullnodeUrl } from "@mysten/sui/client";
 import { createNetworkConfig } from "@mysten/dapp-kit";
 
+// Allow custom RPC URL via environment variable, fallback to default
+const getTestnetUrl = () => {
+  if (process.env.NEXT_PUBLIC_SUI_RPC_URL) {
+    return process.env.NEXT_PUBLIC_SUI_RPC_URL;
+  }
+  return getFullnodeUrl("testnet");
+};
+
 const { networkConfig, useNetworkVariable, useNetworkVariables } =
   createNetworkConfig({
     devnet: {
       url: getFullnodeUrl("devnet"),
     },
     testnet: {
-      url: getFullnodeUrl("testnet"),
+      url: getTestnetUrl(),
     },
     mainnet: {
       url: getFullnodeUrl("mainnet"),
