@@ -22,6 +22,9 @@ export interface PaymentPayload {
   nonce: string;
   timestamp: number;
   transactionDigest?: string;
+  // Play credits payment fields
+  playCredits?: boolean;
+  userSuiAddress?: string; // User's main Sui address (for play credits lookup)
 }
 
 export interface PaymentVerification {

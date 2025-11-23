@@ -4,6 +4,7 @@ import {
   generatePaymentInstruction,
   PaymentPayload,
 } from "../services/x402Service.js";
+import { playCreditsService } from "../services/playCreditsService.js";
 
 /**
  * x402 Middleware
@@ -75,7 +76,62 @@ export async function x402Middleware(
     return;
   }
 
-  // Verify payment
+  // Check if this is a play credits payment
+  if (paymentPayload.playCredits && paymentPayload.userSuiAddress) {
+    console.log(`Processing play credits payment for user: ${paymentPayload.userSuiAddress}`);
+    
+    // Check if user has available play credits
+    const hasCredits = await playCreditsService.hasCredits(
+      paymentPayload.userSuiAddress
+    );
+
+    if (!hasCredits) {
+      console.error(`No play credits available for user: ${paymentPayload.userSuiAddress}`);
+      reply.code(402).send({
+        error: "Insufficient Play Credits",
+        message: "You don't have any play credits. Please purchase credits to play songs.",
+        payment: {
+          amount: Math.floor(amount * 1_000_000_000).toString(),
+          currency: "SUI",
+          recipient,
+          network: `sui-${process.env.SUI_NETWORK || "testnet"}`,
+        },
+        requiresCredits: true,
+      });
+      return;
+    }
+
+    // Use one play credit
+    const useResult = await playCreditsService.useCredit(
+      paymentPayload.userSuiAddress
+    );
+
+    if (!useResult.success) {
+      reply.code(402).send({
+        error: "Failed to Use Credit",
+        message: useResult.error || "Failed to deduct play credit",
+        payment: {
+          amount: Math.floor(amount * 1_000_000_000).toString(),
+          currency: "SUI",
+          recipient,
+          network: `sui-${process.env.SUI_NETWORK || "testnet"}`,
+        },
+      });
+      return;
+    }
+
+    // Credit used successfully
+    (request as any).x402Verified = {
+      valid: true,
+      amount,
+      recipient,
+      paymentMethod: "play_credits",
+      remainingPlays: useResult.remainingPlays,
+    };
+    return;
+  }
+
+  // Regular payment verification (existing flow)
   const amountInMist = Math.floor(amount * 1_000_000_000).toString();
   const verification = await verifyPayment(
     paymentPayload,
@@ -103,6 +159,7 @@ export async function x402Middleware(
     transactionHash: verification.transactionHash,
     amount,
     recipient,
+    paymentMethod: "direct_payment",
   };
 }
 

@@ -6,6 +6,7 @@ import artistRoutes from "./routes/artist.routes.js";
 import songRoutes from "./routes/song.routes.js";
 import walrusRoutes from "./routes/walrus.routes.js";
 import x402Routes from "./routes/x402.routes.js";
+import playCreditsRoutes from "./routes/playCredits.routes.js";
 
 dotenv.config();
 
@@ -54,6 +55,9 @@ async function registerRoutes() {
   await fastify.register(songRoutes, { prefix: "/api/song" });
   await fastify.register(walrusRoutes, { prefix: "/api/walrus" });
   await fastify.register(x402Routes, { prefix: "/x402" });
+  await fastify.register(playCreditsRoutes, {
+    prefix: "/api/play-credits",
+  });
 }
 
 // Health check

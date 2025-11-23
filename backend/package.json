@@ -7,6 +7,7 @@
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
+    "setup-db": "node scripts/setup-db.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
@@ -30,11 +31,13 @@
     "dotenv": "^16.4.7",
     "fastify": "^5.6.2",
     "form-data": "^4.0.1",
+    "pg": "^8.16.3",
     "typescript": "^5.7.2",
     "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@types/node": "^22.19.1",
+    "@types/pg": "^8.15.6",
     "tsx": "^4.19.2"
   }
 }

@@ -7,6 +7,7 @@ import { useCurrentAccount, useSignAndExecuteTransaction, useSignMessage } from 
 import { Transaction } from "@mysten/sui/transactions";
 import { SuiClient } from "@mysten/sui/client";
 import { createPayForPlayTx } from "./sui-transactions";
+import { api } from "./api";
 
 export interface PaymentInstruction {
   amount: string; // Amount in MIST
@@ -27,6 +28,13 @@ export interface PaymentAuthorization {
   expiresAt: number; // Unix timestamp
   maxAmount?: string; // Maximum amount authorized (for "up to" scheme)
   transactionDigest?: string; // The actual transaction hash on-chain
+}
+
+export interface PlayCreditsInfo {
+  remainingPlays: number;
+  totalPurchased: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 const STORAGE_KEY_PREFIX = "x402_auth_";
@@ -242,14 +250,35 @@ export async function makePayment(
 }
 
 /**
- * Request resource with x402 payment
+ * Create play credits payment payload
+ */
+export function createPlayCreditsPaymentPayload(
+  userSuiAddress: string
+): any {
+  return {
+    playCredits: true,
+    userSuiAddress,
+    nonce: generateNonce(),
+    timestamp: Date.now(),
+    // These fields are required by PaymentPayload interface but not used for play credits
+    signature: "play_credits_payment",
+    message: `play_credits_payment_${userSuiAddress}`,
+    publicKey: userSuiAddress,
+    amount: "0", // Not used for play credits
+    recipient: "0x0000000000000000000000000000000000000000", // Not used for play credits
+  };
+}
+
+/**
+ * Request resource with x402 payment (using play credits)
  */
 export async function requestWithPayment<T>(
   url: string,
   authorization: PaymentAuthorization | null,
   amountInSui: number,
   recipient: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  userSuiAddress?: string // Optional: if provided, use play credits
 ): Promise<T> {
   // First attempt without payment
   let response = await fetch(url, options);
@@ -258,29 +287,62 @@ export async function requestWithPayment<T>(
   if (response.status === 402) {
     const paymentData = await response.json();
 
-    if (!authorization) {
-      throw new Error("PAYMENT_AUTHORIZATION_REQUIRED");
-    }
+    // Use play credits if userSuiAddress is provided
+    if (userSuiAddress) {
+      try {
+        // Create play credits payment payload
+        const paymentPayload = createPlayCreditsPaymentPayload(userSuiAddress);
 
-    // Create payment payload
-    const paymentPayload = await makePayment(
-      authorization,
-      amountInSui,
-      recipient
-    );
+        // Retry request with play credits payment header
+        response = await fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            "X-PAYMENT": JSON.stringify(paymentPayload),
+          },
+        });
 
-    // Retry request with payment header
-    response = await fetch(url, {
-      ...options,
-      headers: {
-        ...options.headers,
-        "X-PAYMENT": JSON.stringify(paymentPayload),
-      },
-    });
+        if (response.status === 402) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Insufficient play credits");
+        }
 
-    if (response.status === 402) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Payment verification failed");
+        if (!response.ok) {
+          throw new Error(`Request failed: ${response.statusText}`);
+        }
+
+        return response.json() as T;
+      } catch (error: any) {
+        // Re-throw error - no fallback, play credits are required
+        console.error("Play credits payment failed:", error);
+        throw error;
+      }
+    } else {
+      // Regular payment flow (fallback)
+      if (!authorization) {
+        throw new Error("PAYMENT_AUTHORIZATION_REQUIRED");
+      }
+
+      // Create payment payload
+      const paymentPayload = await makePayment(
+        authorization,
+        amountInSui,
+        recipient
+      );
+
+      // Retry request with payment header
+      response = await fetch(url, {
+        ...options,
+        headers: {
+          ...options.headers,
+          "X-PAYMENT": JSON.stringify(paymentPayload),
+        },
+      });
+
+      if (response.status === 402) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Payment verification failed");
+      }
     }
   }
 
@@ -292,51 +354,75 @@ export async function requestWithPayment<T>(
 }
 
 /**
- * Get stream URL with payment
+ * Get stream URL with payment (using play credits)
  */
 export async function getStreamUrlWithPayment(
   apiUrl: string,
   songId: string,
   authorization: PaymentAuthorization | null,
   amountInSui: number,
-  recipient: string
+  recipient: string,
+  userSuiAddress?: string, // Optional: if provided, use play credits
+  walrusBlobId?: string // Optional: Walrus blob ID for streaming
 ): Promise<string> {
-  const streamUrl = `${apiUrl}/api/song/stream/${songId}`;
-
-  if (!authorization) {
-    throw new Error("Payment authorization required");
+  // Build stream URL with optional walrusBlobId query parameter
+  let streamUrl = `${apiUrl}/api/song/stream/${songId}`;
+  if (walrusBlobId) {
+    streamUrl += `?walrusBlobId=${encodeURIComponent(walrusBlobId)}`;
   }
 
-  // Create payment payload
-  const paymentPayload = await makePayment(
-    authorization,
-    amountInSui,
-    recipient
-  );
+  // Use play credits if userSuiAddress is provided
+  if (userSuiAddress) {
+    try {
+      // Create play credits payment payload
+      const paymentPayload = createPlayCreditsPaymentPayload(userSuiAddress);
 
-  // First request - may get 402
-  let response = await fetch(streamUrl, {
-    method: "GET",
-    headers: {
-      "X-PAYMENT": JSON.stringify(paymentPayload),
-    },
-  });
+      // Request with play credits payment
+      let response = await fetch(streamUrl, {
+        method: "GET",
+        headers: {
+          "X-PAYMENT": JSON.stringify(paymentPayload),
+        },
+      });
 
-  // Handle 402 Payment Required
-  if (response.status === 402) {
-    const paymentData = await response.json();
-    throw new Error(paymentData.message || "Payment required");
-  }
+      // Handle 402 Payment Required
+      if (response.status === 402) {
+        let paymentData;
+        try {
+          paymentData = await response.json();
+        } catch (e) {
+          // If response is not JSON, use default message
+          paymentData = { message: "Payment required" };
+        }
+        throw new Error(paymentData.message || "Insufficient play credits");
+      }
 
-  // Handle successful response
-  if (response.ok) {
-    const data = await response.json();
-    if (data.redirect) {
-      return data.redirect;
+      // Handle other non-ok responses
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { message: `Server error: ${response.status} ${response.statusText}` };
+        }
+        throw new Error(errorData.message || errorData.error || `Server error: ${response.status}`);
+      }
+
+      // Handle successful response
+      const data = await response.json();
+      if (data.redirect) {
+        return data.redirect;
+      }
+
+      throw new Error("Invalid response from server: missing redirect URL");
+    } catch (error: any) {
+      // Re-throw error - no fallback, play credits are required
+      console.error("Play credits payment failed:", error);
+      throw error;
     }
   }
 
-  // Fallback: return the stream URL (will be handled by audio element)
-  return streamUrl;
+  // Play credits are required - throw error if not provided
+  throw new Error("Play credits are required. Please connect your wallet and purchase credits.");
 }
 

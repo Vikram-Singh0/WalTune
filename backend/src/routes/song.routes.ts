@@ -35,11 +35,18 @@ export default async function songRoutes(fastify: FastifyInstance) {
         if (!song) {
           console.warn(`⚠️ Song not found as object, trying to find in events...`);
           const allSongs = await suiService.getAllSongs();
-          song = allSongs.find((s: any) => s.id === id);
+          song = allSongs.find((s: any) => {
+            // Match by full ID or check if ID starts with the provided ID (for partial matches)
+            return s.id === id || s.id?.toLowerCase().startsWith(id.toLowerCase());
+          });
           
           if (song) {
             console.log(`✅ Found song in events: ${song.title}`);
-            console.log(`   Full song object:`, JSON.stringify(song, null, 2));
+            console.log(`   Song ID: ${song.id}`);
+            console.log(`   Walrus Blob ID: ${song.walrusCID || song.walrusBlobId || song.walrus_blob_id}`);
+          } else {
+            console.warn(`⚠️ Song not found in events either. Searched ID: ${id}`);
+            console.log(`   Available song IDs (first 3):`, allSongs.slice(0, 3).map((s: any) => s.id));
           }
         }
         
@@ -51,12 +58,14 @@ export default async function songRoutes(fastify: FastifyInstance) {
         if (song) {
           pricePerPlay = song.pricePerPlay || 0.01;
           recipient = song.artistId || song.artist_id || "";
-          walrusBlobId = song.walrusCID || song.walrusBlobId || song.walrus_blob_id || "";
+          // Try multiple possible field names for walrus blob ID
+          walrusBlobId = song.walrusCID || song.walrusBlobId || song.walrus_blob_id || song.walrusBlobId || "";
           
           console.log(`✅ Song found: ${song.title}`);
           console.log(`   Price: ${pricePerPlay} SUI`);
           console.log(`   Artist ID: ${recipient}`);
           console.log(`   Walrus Blob ID: ${walrusBlobId}`);
+          console.log(`   Song object keys:`, Object.keys(song));
           
           // If no recipient found, use a placeholder (for x402 demo)
           if (!recipient) {
@@ -83,25 +92,27 @@ export default async function songRoutes(fastify: FastifyInstance) {
         }
 
         // Payment verified - return the Walrus stream URL
-        // Only return 404 if song not found AFTER payment verification AND no fallback provided
-        if (!song && !fallbackBlobId) {
-          console.error(`❌ Payment verified but song not found: ${id}`);
+        // Use song's blob ID or fallback from request
+        const finalBlobId = walrusBlobId || fallbackBlobId;
+        
+        // Only return 404 if song not found AND no blob ID available
+        if (!song && !finalBlobId) {
+          console.error(`❌ Payment verified but song not found and no blob ID: ${id}`);
           return reply.code(404).send({
             error: "Song not found",
-            message: "Payment verified but song not found in blockchain.",
+            message: "Payment verified but song not found in blockchain and no blob ID provided.",
             songId: id,
           });
         }
         
-        // Use song's blob ID or fallback from request
-        const finalBlobId = walrusBlobId || fallbackBlobId;
-        
         if (!finalBlobId) {
           console.error(`❌ Song found but no Walrus blob ID: ${id}`);
+          console.error(`   Song object:`, JSON.stringify(song, null, 2));
           return reply.code(500).send({
             error: "Stream unavailable",
             message: "Song found but Walrus blob ID missing.",
             songId: id,
+            songTitle: song?.title,
           });
         }
 

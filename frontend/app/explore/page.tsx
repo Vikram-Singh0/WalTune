@@ -1,15 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSuiClient } from "@mysten/dapp-kit";
+import { useSuiClient, useCurrentAccount } from "@mysten/dapp-kit";
 import { Navbar } from "@/components/Navbar";
 import { SongCard } from "@/components/SongCard";
 import { MusicPlayer } from "@/components/MusicPlayer";
+import { PlayCredits } from "@/components/PlayCredits";
 import { Song } from "@/types";
 import { getWalrusStreamUrl } from "@/lib/sui-config";
 
 export default function ExplorePage() {
   const suiClient = useSuiClient();
+  const account = useCurrentAccount();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSong, setCurrentSong] = useState<Song | null>(null);
@@ -105,6 +107,13 @@ export default function ExplorePage() {
             Discover decentralized music from artists worldwide
           </p>
         </div>
+
+        {/* Play Credits - Show when user is connected */}
+        {account && (
+          <div className="mb-8">
+            <PlayCredits />
+          </div>
+        )}
 
         {/* Search and Filters */}
         <div className="bg-[#1a1a1a] rounded-2xl border border-white/5 p-6 mb-12">

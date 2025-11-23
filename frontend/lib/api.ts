@@ -1,7 +1,7 @@
 import { Song } from "@/types";
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export const api = {
   // Artist endpoints
@@ -57,5 +57,42 @@ export const api = {
   async getSongsByArtist(artistId: string) {
     const response = await fetch(`${API_URL}/api/song/artist/${artistId}`);
     return response.json();
+  },
+
+  // Play credits endpoints
+  async getPlayCredits(userSuiAddress: string) {
+    const response = await fetch(
+      `${API_URL}/api/play-credits?userSuiAddress=${encodeURIComponent(userSuiAddress)}`
+    );
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+    return data;
+  },
+
+  async purchasePlayCredits(
+    userSuiAddress: string,
+    numberOfPlays: number,
+    amountInSui: number,
+    transactionDigest: string,
+    paymentPayload?: any
+  ) {
+    const response = await fetch(`${API_URL}/api/play-credits/purchase`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userSuiAddress,
+        numberOfPlays,
+        amountInSui,
+        transactionDigest,
+        paymentPayload,
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+    return data;
   },
 };
