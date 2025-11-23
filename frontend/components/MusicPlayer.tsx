@@ -3,6 +3,20 @@
 import { useState, useRef, useEffect } from "react";
 import { Song } from "@/types";
 import { getWalrusStreamUrl } from "@/lib/sui-config";
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+  useSuiClient,
+  useSignPersonalMessage, // Correct hook name
+  useWallets,
+} from "@mysten/dapp-kit";
+import {
+  getStoredAuthorization,
+  PaymentAuthorization,
+  makePayment,
+} from "@/lib/x402-client";
+import { api } from "@/lib/api";
+import { Loader2, AlertCircle, Wallet } from "lucide-react";
 
 interface MusicPlayerProps {
   song: Song;
@@ -10,18 +24,228 @@ interface MusicPlayerProps {
 }
 
 export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
+  const account = useCurrentAccount();
+  const suiClient = useSuiClient();
+  const { mutate: signMessage } = useSignPersonalMessage();
+  const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
+
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(1);
+  const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [paymentStatus, setPaymentStatus] = useState<
+    "idle" | "authorizing" | "paying" | "paid" | "error"
+  >("idle");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authorization, setAuthorization] =
+    useState<PaymentAuthorization | null>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const paymentInProgressRef = useRef(false); // Prevent duplicate payment executions
 
-  // Get stream URL from Walrus blob ID
-  const streamUrl = song.streamUrl || getWalrusStreamUrl(song.walrusBlobId);
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+
+  // Initialize payment authorization and stream URL
+  useEffect(() => {
+    // Always use backend endpoint (protected by x402)
+    // Even without wallet, backend will handle it
+    if (account?.address) {
+      initializePayment();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [account?.address, song.id]);
+
+  const initializePayment = async () => {
+    if (!account) return;
+    
+    // Prevent duplicate payment executions
+    if (paymentInProgressRef.current) {
+      console.log("⏸️ Payment already in progress, skipping...");
+      return;
+    }
+
+    try {
+      paymentInProgressRef.current = true;
+      setPaymentStatus("paying");
+
+      // Always try to get stream URL from backend (will return 402 if payment needed)
+      // Pass walrusBlobId as query param for fallback in case backend can't find song on-chain
+      const streamEndpoint = `${API_URL}/api/song/stream/${song.id}?walrusBlobId=${song.walrusBlobId}`;
+      
+      console.log("🎵 Requesting stream URL from backend:", streamEndpoint);
+      
+      // First request without payment header - backend will return 402
+      let response = await fetch(streamEndpoint, {
+        method: "GET",
+      });
+
+      console.log("📡 Backend response status:", response.status);
+
+      // Handle 402 Payment Required
+      if (response.status === 402) {
+        const paymentData = await response.json();
+        console.log("💰 Payment required:", paymentData);
+
+        // Check for existing authorization
+        let auth = getStoredAuthorization(song.artistId);
+
+        // If no authorization, create a simple one (for testing)
+        // In production, this should be signed by wallet
+        if (!auth) {
+          console.log("🔐 Creating authorization...");
+          const message = createAuthorizationMessage(
+            song.artistId,
+            Math.floor(1.0 * 1_000_000_000).toString(), // 1 SUI max
+            Date.now() + 24 * 60 * 60 * 1000 // 24 hours
+          );
+
+          // Create authorization (without signature for now - will be verified by facilitator)
+          auth = {
+            signature: `auth_${Date.now()}_${account.address}`, // Temporary auth token
+            message,
+            publicKey: account.address,
+            amount: "0",
+            recipient: song.artistId,
+            nonce: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            timestamp: Date.now(),
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+            maxAmount: Math.floor(1.0 * 1_000_000_000).toString(),
+          };
+
+          storeAuthorization(song.artistId, auth);
+          setAuthorization(auth);
+        }
+
+        // Retry request with payment header
+        console.log("💳 Retrying with payment authorization...");
+        
+        // Check if we already have a transaction digest for this song (avoid duplicate transactions)
+        const paymentKey = `x402_payment_${song.id}_${song.artistId}`;
+        const existingPayment = localStorage.getItem(paymentKey);
+        let paymentPayload;
+        
+        if (existingPayment) {
+          try {
+            const cached = JSON.parse(existingPayment);
+            // Check if cached payment is recent (within last 5 minutes)
+            const paymentAge = Date.now() - cached.timestamp;
+            if (paymentAge < 5 * 60 * 1000 && cached.transactionDigest) {
+              console.log("♻️ Reusing existing payment transaction:", cached.transactionDigest);
+              paymentPayload = cached;
+            } else {
+              // Cache expired, create new payment
+              localStorage.removeItem(paymentKey);
+              throw new Error("Cache expired");
+            }
+          } catch {
+            // Cache invalid, proceed to create new payment
+            paymentPayload = null;
+          }
+        }
+        
+        // Execute REAL payment transaction if we don't have a cached one
+        if (!paymentPayload) {
+          if (song.artistId && song.artistId !== "0x0000000000000000000000000000000000000000") {
+            console.log("💸 Creating new payment transaction...");
+            paymentPayload = await makePayment(
+              auth,
+              song.pricePerPlay,
+              song.artistId,
+              signAndExecuteTransaction,
+              song.id
+            );
+            
+            // Cache the payment for reuse
+            if (paymentPayload.transactionDigest) {
+              localStorage.setItem(paymentKey, JSON.stringify({
+                ...paymentPayload,
+                timestamp: Date.now(),
+              }));
+            }
+          } else {
+            console.warn("⚠️ Invalid recipient for real payment, using mock payload");
+            paymentPayload = await makePayment(
+              auth,
+              song.pricePerPlay,
+              song.artistId || "0x0000000000000000000000000000000000000000"
+            );
+          }
+        }
+
+        response = await fetch(streamEndpoint, {
+          method: "GET",
+          headers: {
+            "X-PAYMENT": JSON.stringify(paymentPayload),
+          },
+        });
+
+        console.log("📡 Payment response status:", response.status);
+
+        if (response.status === 402) {
+          const errorData = await response.json();
+          throw new Error(errorData.message || "Payment verification failed");
+        }
+      }
+
+      // Get stream URL from response
+      if (response.ok) {
+        const data = await response.json();
+        // Backend returns Walrus URL after payment verification
+        const finalStreamUrl = data.redirect || streamEndpoint;
+        
+        console.log("✅ Payment verified, stream URL:", finalStreamUrl);
+        setStreamUrl(finalStreamUrl);
+        setPaymentStatus("paid");
+
+        // Record play on backend
+        try {
+          await api.recordPlay(song.id);
+        } catch (error) {
+          console.error("Failed to record play:", error);
+        }
+      } else {
+        throw new Error(`Failed to get stream: ${response.statusText}`);
+      }
+    } catch (error: any) {
+      console.error("Payment initialization error:", error);
+      setPaymentStatus("error");
+      setErrorMessage(error.message || "Payment required to stream this song.");
+      // Don't fallback to direct URL - payment is required
+      setStreamUrl(null);
+    } finally {
+      paymentInProgressRef.current = false;
+    }
+  };
+
+  const createAuthorizationMessage = (
+    recipient: string,
+    maxAmount: string,
+    expiresAt: number
+  ): string => {
+    return JSON.stringify({
+      type: "x402_payment_authorization",
+      recipient,
+      maxAmount,
+      expiresAt,
+      network: "sui-testnet",
+      timestamp: Date.now(),
+    });
+  };
+
+  const storeAuthorization = (recipient: string, auth: PaymentAuthorization) => {
+    const key = `x402_auth_${recipient}`;
+    localStorage.setItem(key, JSON.stringify(auth));
+  };
 
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !streamUrl) return;
+
+    // Only auto-play if payment is successful
+    if (paymentStatus !== "paid" && paymentStatus !== "idle") {
+      return;
+    }
 
     console.log("[MusicPlayer] Loading audio from:", streamUrl);
 
@@ -42,7 +266,8 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
     audio.addEventListener("error", handleError);
     audio.addEventListener("canplay", handleCanPlay);
 
-    // Auto play when component mounts
+    // Auto play when stream URL is ready
+    if (paymentStatus === "paid") {
     audio
       .play()
       .then(() => {
@@ -53,6 +278,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
         console.error("[MusicPlayer] Failed to play:", err);
         setIsPlaying(false);
       });
+    }
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
@@ -61,7 +287,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
       audio.removeEventListener("error", handleError);
       audio.removeEventListener("canplay", handleCanPlay);
     };
-  }, [streamUrl]);
+  }, [streamUrl, paymentStatus]);
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -100,12 +326,54 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
     <div className="fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-white/10 shadow-2xl z-50 text-white">
       <audio
         ref={audioRef}
-        src={streamUrl}
+        src={streamUrl || undefined}
         crossOrigin="anonymous"
         preload="metadata"
       />
 
       <div className="container mx-auto px-4 py-4">
+        {/* Payment Status Indicator */}
+        {account && paymentStatus !== "paid" && paymentStatus !== "idle" && (
+          <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
+            {paymentStatus === "authorizing" && (
+              <div className="flex items-center gap-2 text-sm text-gray-300">
+                <Loader2 className="w-4 h-4 animate-spin text-[#4ade80]" />
+                <span>Authorizing payment...</span>
+              </div>
+            )}
+            {paymentStatus === "paying" && (
+              <div className="flex items-center gap-2 text-sm text-gray-300">
+                <Loader2 className="w-4 h-4 animate-spin text-[#4ade80]" />
+                <span>Processing payment ({song.pricePerPlay} SUI)...</span>
+              </div>
+            )}
+            {paymentStatus === "error" && (
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm text-yellow-400">
+                  <AlertCircle className="w-4 h-4" />
+                  <span>
+                    {errorMessage || "Payment authorization not supported. Streaming without payment."}
+                  </span>
+                </div>
+                <button
+                  onClick={initializePayment}
+                  className="text-xs px-3 py-1 bg-[#4ade80] text-black rounded-full hover:bg-[#22c55e] transition-colors"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Payment Info */}
+        {account && paymentStatus === "paid" && (
+          <div className="mb-2 text-xs text-gray-500 text-center">
+            {streamUrl?.includes("walrus") 
+              ? `Streaming from Walrus${authorization ? ` • Payment authorized` : " • Free stream"}`
+              : "Loading stream..."}
+          </div>
+        )}
         {/* Progress Bar */}
         <div className="mb-4 group">
           <input
