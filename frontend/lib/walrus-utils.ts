@@ -44,7 +44,10 @@ export async function uploadFileToWalrus(
   console.log(`   File: ${file.name}, Epochs: ${epochs}`);
 
   // PRIMARY METHOD: Use HTTP publisher endpoint (faster, no WASM)
-  const publisherUrl = process.env.NEXT_PUBLIC_WALRUS_PUBLISHER_URL;
+  const publisherUrl = process.env.NEXT_PUBLIC_WALRUS_PUBLISHER_URL 
+    || 'https://publisher.walrus-testnet.walrus.space';
+  
+  console.log('[Walrus] Publisher URL:', publisherUrl);
 
   if (publisherUrl) {
     try {
