@@ -14,10 +14,7 @@ import {
   createRegisterArtistTx,
   createRegisterSongTx,
 } from "@/lib/sui-transactions";
-import {
-  getWalrusStreamUrl,
-  PACKAGE_ID,
-} from "@/lib/sui-config";
+import { getWalrusStreamUrl, PACKAGE_ID } from "@/lib/sui-config";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic2,
@@ -230,36 +227,25 @@ export default function DashboardPage() {
 
     setUploading(true);
     try {
-      console.log("📤 Step 1: Uploading audio to Walrus via backend...");
+      console.log("📤 Step 1: Uploading audio to Walrus...");
       console.log(
         "File size:",
         (uploadForm.file.size / 1024 / 1024).toFixed(2),
         "MB"
       );
 
-      // Step 1: Upload audio file to Walrus via backend proxy (to avoid CORS)
-      const formData = new FormData();
-      formData.append("file", uploadForm.file);
+      // Step 1: Upload audio file to Walrus using SDK
+      // Dynamically import to avoid SSR issues with WASM
+      const { uploadFileToWalrus } = await import("@/lib/walrus-utils");
 
-      const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
-      const backendResponse = await fetch(
-        `${API_URL}/api/walrus/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
+      const { blobId } = await uploadFileToWalrus(
+        uploadForm.file,
+        undefined, // No wallet needed - HTTP method is used
+        5 // Store for 5 epochs
       );
 
-      if (!backendResponse.ok) {
-        const errorData = await backendResponse.json();
-        console.error("Backend upload error:", errorData);
-        throw new Error(errorData.error || "Backend upload failed");
-      }
-
-      const { blobId } = await backendResponse.json();
-
       if (!blobId) {
-        throw new Error("No blob ID returned from backend");
+        throw new Error("No blob ID returned from Walrus");
       }
 
       console.log("✅ Uploaded to Walrus, blob ID:", blobId);

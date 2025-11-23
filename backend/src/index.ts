@@ -19,9 +19,22 @@ const HOST = process.env.HOST || "0.0.0.0";
 
 // Register plugins
 async function registerPlugins() {
-  // CORS
+  // CORS - Allow multiple origins
+  const allowedOrigins = process.env.FRONTEND_URL
+    ? process.env.FRONTEND_URL.split(",").map((url) => url.trim())
+    : ["http://localhost:3000"];
+
   await fastify.register(cors, {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: (origin, cb) => {
+      // Allow requests with no origin (like mobile apps, curl, etc.)
+      if (!origin) return cb(null, true);
+
+      if (allowedOrigins.includes(origin)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Not allowed by CORS"), false);
+      }
+    },
     credentials: true,
   });
 

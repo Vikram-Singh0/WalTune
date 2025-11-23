@@ -23,25 +23,45 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
     const audio = audioRef.current;
     if (!audio) return;
 
+    console.log("[MusicPlayer] Loading audio from:", streamUrl);
+
     const updateTime = () => setCurrentTime(audio.currentTime);
     const updateDuration = () => setDuration(audio.duration);
+    const handleError = (e: Event) => {
+      console.error("[MusicPlayer] Audio error:", e);
+      console.error("[MusicPlayer] Audio error details:", audio.error);
+      setIsPlaying(false);
+    };
+    const handleCanPlay = () => {
+      console.log("[MusicPlayer] Audio can play, duration:", audio.duration);
+    };
 
     audio.addEventListener("timeupdate", updateTime);
     audio.addEventListener("loadedmetadata", updateDuration);
     audio.addEventListener("ended", () => setIsPlaying(false));
+    audio.addEventListener("error", handleError);
+    audio.addEventListener("canplay", handleCanPlay);
 
     // Auto play when component mounts
     audio
       .play()
-      .then(() => setIsPlaying(true))
-      .catch(() => setIsPlaying(false));
+      .then(() => {
+        console.log("[MusicPlayer] Playing audio");
+        setIsPlaying(true);
+      })
+      .catch((err) => {
+        console.error("[MusicPlayer] Failed to play:", err);
+        setIsPlaying(false);
+      });
 
     return () => {
       audio.removeEventListener("timeupdate", updateTime);
       audio.removeEventListener("loadedmetadata", updateDuration);
       audio.removeEventListener("ended", () => setIsPlaying(false));
+      audio.removeEventListener("error", handleError);
+      audio.removeEventListener("canplay", handleCanPlay);
     };
-  }, []);
+  }, [streamUrl]);
 
   const togglePlay = () => {
     if (audioRef.current) {
@@ -78,7 +98,12 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-white/10 shadow-2xl z-50 text-white">
-      <audio ref={audioRef} src={streamUrl} />
+      <audio
+        ref={audioRef}
+        src={streamUrl}
+        crossOrigin="anonymous"
+        preload="metadata"
+      />
 
       <div className="container mx-auto px-4 py-4">
         {/* Progress Bar */}

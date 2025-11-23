@@ -35,5 +35,5 @@ export const WALRUS_AGGREGATOR_URL =
 
 // Helper to get Walrus stream URL from blob ID
 export function getWalrusStreamUrl(blobId: string): string {
-  return `${WALRUS_AGGREGATOR_URL}/v1/${blobId}`;
+  return `${WALRUS_AGGREGATOR_URL}/v1/blobs/${blobId}`;
 }

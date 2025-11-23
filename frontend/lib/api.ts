@@ -1,6 +1,7 @@
 import { Song } from "@/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://waltune.onrender.com";
 
 export const api = {
   // Artist endpoints
