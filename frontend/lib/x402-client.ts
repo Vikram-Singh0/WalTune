@@ -3,7 +3,7 @@
  * Handles seamless micropayments for music streaming
  */
 
-import { useCurrentAccount, useSignAndExecuteTransaction, useSignMessage } from "@mysten/dapp-kit";
+import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { SuiClient } from "@mysten/sui/client";
 import { createPayForPlayTx } from "./sui-transactions";

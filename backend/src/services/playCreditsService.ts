@@ -179,7 +179,7 @@ export class PlayCreditsService {
 
       const newRemainingPlays = credits.remainingPlays - 1;
 
-      const updateResult = await query<PlayCredits>(
+      const updateResult = await query<{ remaining_plays: number }>(
         `UPDATE play_credits
          SET remaining_plays = $1, updated_at = CURRENT_TIMESTAMP
          WHERE user_sui_address = $2
