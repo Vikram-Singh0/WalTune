@@ -116,6 +116,15 @@ export default async function songRoutes(fastify: FastifyInstance) {
           });
         }
 
+        // Record play on blockchain (async, don't block response)
+        if (song) {
+          suiService.recordPlay(id).then(() => {
+            console.log(`✅ Play recorded on blockchain for song: ${id}`);
+          }).catch((err: any) => {
+            console.error(`⚠️ Failed to record play on blockchain:`, err);
+          });
+        }
+
         console.log(`✅ Payment verified, returning stream URL`);
         const walrusAggregatorUrl =
           process.env.WALRUS_AGGREGATOR_URL ||

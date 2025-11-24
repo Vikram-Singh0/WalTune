@@ -80,12 +80,8 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
       setStreamUrl(streamUrl);
       setPaymentStatus("paid");
 
-      // Record play on backend
-      try {
-        await api.recordPlay(song.id);
-      } catch (error) {
-        console.error("Failed to record play:", error);
-      }
+      // Play count is now recorded automatically by the backend when payment is verified
+      console.log("✅ Play will be recorded on blockchain by backend middleware");
     } catch (error: any) {
       console.error("Payment initialization error:", error);
       setPaymentStatus("error");

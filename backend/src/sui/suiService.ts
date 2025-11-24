@@ -2,6 +2,7 @@ import { SuiClient, getFullnodeUrl } from "@mysten/sui/client";
 import { Transaction } from "@mysten/sui/transactions";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { fromBase64 } from "@mysten/sui/utils";
+import { config } from "../config/env.js";
 
 /**
  * Sui Client for interacting with the blockchain
@@ -15,15 +16,22 @@ export class SuiService {
   private songRegistryId: string;
 
   constructor() {
-    this.network =
-      (process.env.SUI_NETWORK as "testnet" | "mainnet") || "testnet";
-    const rpcUrl = process.env.SUI_RPC_URL || getFullnodeUrl(this.network);
+    this.network = config.SUI_NETWORK as "testnet" | "mainnet";
+    const rpcUrl = config.SUI_RPC_URL || getFullnodeUrl(this.network);
     this.client = new SuiClient({ url: rpcUrl });
 
-    // Load from environment variables
-    this.packageId = process.env.PACKAGE_ID || "";
-    this.artistRegistryId = process.env.ARTIST_REGISTRY_ID || "";
-    this.songRegistryId = process.env.SONG_REGISTRY_ID || "";
+    // Load from configuration
+    this.packageId = config.PACKAGE_ID;
+    this.artistRegistryId = config.ARTIST_REGISTRY_ID;
+    this.songRegistryId = config.SONG_REGISTRY_ID;
+
+    // Debug: Log what we're loading
+    console.log("🔧 SuiService Configuration:");
+    console.log("   PACKAGE_ID:", this.packageId || "❌ NOT SET");
+    console.log("   ARTIST_REGISTRY_ID:", this.artistRegistryId || "❌ NOT SET");
+    console.log("   SONG_REGISTRY_ID:", this.songRegistryId || "❌ NOT SET");
+    console.log("   SUI_NETWORK:", this.network);
+    console.log("   SUI_RPC_URL:", rpcUrl);
 
     if (!this.packageId || !this.artistRegistryId || !this.songRegistryId) {
       console.warn("⚠️ Sui contract addresses not configured in .env");
@@ -237,6 +245,69 @@ export class SuiService {
     } catch (error) {
       console.error("Failed to get earnings:", error);
       return 0;
+    }
+  }
+
+  /**
+   * Record a play on the blockchain
+   * This increments the totalPlays counter on the Song object
+   */
+  async recordPlay(songId: string): Promise<{
+    success: boolean;
+    txDigest?: string;
+    error?: string;
+  }> {
+    try {
+      if (!this.packageId) {
+        throw new Error("Smart contracts not configured");
+      }
+
+      console.log(`⛓️ Recording play for song ${songId} on blockchain...`);
+
+      // Get backend keypair from configuration
+      const privateKeyBase64 = config.BACKEND_PRIVATE_KEY;
+      if (!privateKeyBase64) {
+        throw new Error("BACKEND_PRIVATE_KEY not configured in .env");
+      }
+
+      // Decode from Base64 and remove the first byte (flag byte)
+      const privateKeyBytes = fromBase64(privateKeyBase64);
+      // Sui keys include a 1-byte flag at the start, we need to remove it
+      const secretKey = privateKeyBytes.slice(1);
+      const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+
+      // Create transaction to record play
+      const tx = new Transaction();
+
+      tx.moveCall({
+        target: `${this.packageId}::song_registry::record_play`,
+        arguments: [tx.object(songId)],
+      });
+
+      // Sign and execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        options: {
+          showEffects: true,
+        },
+      });
+
+      if (result.effects?.status?.status === "success") {
+        console.log(`✅ Play recorded on blockchain. Tx: ${result.digest}`);
+        return {
+          success: true,
+          txDigest: result.digest,
+        };
+      } else {
+        throw new Error(`Transaction failed: ${result.effects?.status?.error}`);
+      }
+    } catch (error) {
+      console.error("Failed to record play:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   }
 }

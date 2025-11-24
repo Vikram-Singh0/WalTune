@@ -128,32 +128,50 @@ export default function DashboardPage() {
 
       console.log("📝 Found total events:", events.data.length);
 
-      // Filter for songs by this artist and parse
-      const parsedSongs = events.data
-        .map((event: any) => {
-          const fields = event.parsedJson;
-          if (fields && fields.artist_id === account.address) {
-            return {
-              id: fields.song_id,
-              title: fields.title,
-              artistId: fields.artist_id,
-              artistName: fields.artist_name,
-              walrusBlobId: fields.walrus_blob_id,
-              pricePerPlay: Number(fields.price_per_play) / 1_000_000_000,
-              duration: Number(fields.duration),
-              genre: fields.genre || "Unknown",
-              coverImage: "",
-              totalPlays: 0,
-              uploadedAt: Number(fields.uploaded_at) || 0,
-              streamUrl: getWalrusStreamUrl(fields.walrus_blob_id),
-            } as Song;
+      // Filter for songs by this artist
+      const artistSongIds = events.data
+        .map((event: any) => event.parsedJson)
+        .filter((fields: any) => fields && fields.artist_id === account.address)
+        .map((fields: any) => fields.song_id);
+
+      console.log("🎵 Found", artistSongIds.length, "songs by this artist");
+
+      // Fetch actual Song objects to get current play counts
+      const parsedSongs: Song[] = [];
+      for (const songId of artistSongIds) {
+        try {
+          const songObject = await client.getObject({
+            id: songId,
+            options: {
+              showContent: true,
+              showType: true,
+            },
+          });
+
+          const content = songObject.data?.content as any;
+          if (content?.fields) {
+            parsedSongs.push({
+              id: songId,
+              title: content.fields.title,
+              artistId: content.fields.artist_id,
+              artistName: content.fields.artist_name,
+              walrusBlobId: content.fields.walrus_blob_id,
+              pricePerPlay: Number(content.fields.price_per_play) / 1_000_000_000,
+              duration: Number(content.fields.duration),
+              genre: content.fields.genre || "Unknown",
+              coverImage: content.fields.cover_image || "",
+              totalPlays: Number(content.fields.total_plays) || 0, // ✅ Now fetching actual play count
+              uploadedAt: Number(content.fields.uploaded_at) || 0,
+              streamUrl: getWalrusStreamUrl(content.fields.walrus_blob_id),
+            });
           }
-          return null;
-        })
-        .filter((song): song is Song => song !== null) as Song[];
+        } catch (err) {
+          console.error(`Failed to fetch song ${songId}:`, err);
+        }
+      }
 
       setSongs(parsedSongs);
-      console.log("✅ Loaded your songs:", parsedSongs);
+      console.log("✅ Loaded your songs with play counts:", parsedSongs);
     } catch (error) {
       console.error("Failed to load songs:", error);
     }

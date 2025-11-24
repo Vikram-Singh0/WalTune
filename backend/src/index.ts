@@ -1,14 +1,15 @@
+// Load environment variables FIRST before any other imports
+import dotenv from "dotenv";
+dotenv.config();
+
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import multipart from "@fastify/multipart";
-import dotenv from "dotenv";
 import artistRoutes from "./routes/artist.routes.js";
 import songRoutes from "./routes/song.routes.js";
 import walrusRoutes from "./routes/walrus.routes.js";
 import x402Routes from "./routes/x402.routes.js";
 import playCreditsRoutes from "./routes/playCredits.routes.js";
-
-dotenv.config();
 
 const fastify = Fastify({
   logger: {
