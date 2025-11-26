@@ -46,7 +46,11 @@ export default function ExplorePage() {
         .map((event: any) => event.parsedJson?.song_id)
         .filter((id: string | undefined): id is string => !!id);
 
-      console.log("🎵 Found", songIds.length, "songs, fetching details with play counts...");
+      console.log(
+        "🎵 Found",
+        songIds.length,
+        "songs, fetching details with play counts..."
+      );
 
       // Fetch actual Song objects to get current play counts
       const parsedSongs: Song[] = [];
@@ -68,7 +72,8 @@ export default function ExplorePage() {
               artistId: content.fields.artist_id,
               artistName: content.fields.artist_name,
               walrusBlobId: content.fields.walrus_blob_id,
-              pricePerPlay: Number(content.fields.price_per_play) / 1_000_000_000,
+              pricePerPlay:
+                Number(content.fields.price_per_play) / 1_000_000_000,
               duration: Number(content.fields.duration),
               genre: content.fields.genre || "Unknown",
               coverImage: content.fields.cover_image || "",

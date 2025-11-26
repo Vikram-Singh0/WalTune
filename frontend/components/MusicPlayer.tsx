@@ -3,12 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Song } from "@/types";
 import { getWalrusStreamUrl } from "@/lib/sui-config";
-import {
-  useCurrentAccount,
-} from "@mysten/dapp-kit";
-import {
-  getStreamUrlWithPayment,
-} from "@/lib/x402-client";
+import { useCurrentAccount } from "@mysten/dapp-kit";
+import { getStreamUrlWithPayment } from "@/lib/x402-client";
 import { api } from "@/lib/api";
 import { Loader2, AlertCircle, Wallet } from "lucide-react";
 
@@ -32,8 +28,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const paymentInProgressRef = useRef(false); // Prevent duplicate payment executions
 
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
   // Initialize payment authorization and stream URL
   useEffect(() => {
@@ -51,7 +46,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
       setErrorMessage("Please connect your wallet to play music");
       return;
     }
-    
+
     // Prevent duplicate payment executions
     if (paymentInProgressRef.current) {
       console.log("⏸️ Payment already in progress, skipping...");
@@ -64,7 +59,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
 
       // Use play credits system
       console.log("💳 Using play credits for payment");
-      
+
       // Use play credits payment
       const streamUrl = await getStreamUrlWithPayment(
         API_URL,
@@ -75,20 +70,27 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
         account.address, // Pass user address for play credits
         song.walrusBlobId // Pass Walrus blob ID for streaming
       );
-      
-      console.log("✅ Payment verified via play credits, stream URL:", streamUrl);
+
+      console.log(
+        "✅ Payment verified via play credits, stream URL:",
+        streamUrl
+      );
       setStreamUrl(streamUrl);
       setPaymentStatus("paid");
 
       // Play count is now recorded automatically by the backend when payment is verified
-      console.log("✅ Play will be recorded on blockchain by backend middleware");
+      console.log(
+        "✅ Play will be recorded on blockchain by backend middleware"
+      );
     } catch (error: any) {
       console.error("Payment initialization error:", error);
       setPaymentStatus("error");
       const errorMsg = error.message || "Payment required to stream this song.";
       // Check if it's a credits issue
       if (errorMsg.includes("credits") || errorMsg.includes("Insufficient")) {
-        setErrorMessage("You don't have enough play credits. Please purchase credits to play songs.");
+        setErrorMessage(
+          "You don't have enough play credits. Please purchase credits to play songs."
+        );
       } else {
         setErrorMessage(errorMsg);
       }
@@ -97,7 +99,6 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
       paymentInProgressRef.current = false;
     }
   };
-
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -129,16 +130,16 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
 
     // Auto play when stream URL is ready
     if (paymentStatus === "paid") {
-    audio
-      .play()
-      .then(() => {
-        console.log("[MusicPlayer] Playing audio");
-        setIsPlaying(true);
-      })
-      .catch((err) => {
-        console.error("[MusicPlayer] Failed to play:", err);
-        setIsPlaying(false);
-      });
+      audio
+        .play()
+        .then(() => {
+          console.log("[MusicPlayer] Playing audio");
+          setIsPlaying(true);
+        })
+        .catch((err) => {
+          console.error("[MusicPlayer] Failed to play:", err);
+          setIsPlaying(false);
+        });
     }
 
     return () => {
@@ -213,7 +214,8 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
                 <div className="flex items-center gap-2 text-sm text-yellow-400">
                   <AlertCircle className="w-4 h-4" />
                   <span>
-                    {errorMessage || "Payment authorization not supported. Streaming without payment."}
+                    {errorMessage ||
+                      "Payment authorization not supported. Streaming without payment."}
                   </span>
                 </div>
                 <button
@@ -230,7 +232,7 @@ export function MusicPlayer({ song, onClose }: MusicPlayerProps) {
         {/* Payment Info */}
         {account && paymentStatus === "paid" && (
           <div className="mb-2 text-xs text-gray-500 text-center">
-            {streamUrl?.includes("walrus") 
+            {streamUrl?.includes("walrus")
               ? `Streaming from Walrus • Payment via play credits`
               : "Loading stream..."}
           </div>

@@ -156,7 +156,8 @@ export default function DashboardPage() {
               artistId: content.fields.artist_id,
               artistName: content.fields.artist_name,
               walrusBlobId: content.fields.walrus_blob_id,
-              pricePerPlay: Number(content.fields.price_per_play) / 1_000_000_000,
+              pricePerPlay:
+                Number(content.fields.price_per_play) / 1_000_000_000,
               duration: Number(content.fields.duration),
               genre: content.fields.genre || "Unknown",
               coverImage: content.fields.cover_image || "",

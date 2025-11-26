@@ -1,7 +1,6 @@
 import { Song } from "@/types";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001";
 
 export const api = {
   // Artist endpoints
@@ -62,7 +61,9 @@ export const api = {
   // Play credits endpoints
   async getPlayCredits(userSuiAddress: string) {
     const response = await fetch(
-      `${API_URL}/api/play-credits?userSuiAddress=${encodeURIComponent(userSuiAddress)}`
+      `${API_URL}/api/play-credits?userSuiAddress=${encodeURIComponent(
+        userSuiAddress
+      )}`
     );
     const data = await response.json();
     if (!response.ok) {
@@ -89,6 +90,16 @@ export const api = {
         paymentPayload,
       }),
     });
+    const data = await response.json();
+    if (!response.ok) {
+      return { success: false, error: data.error || `HTTP ${response.status}` };
+    }
+    return data;
+  },
+
+  // Config endpoints
+  async getPublicConfig() {
+    const response = await fetch(`${API_URL}/api/config/public`);
     const data = await response.json();
     if (!response.ok) {
       return { success: false, error: data.error || `HTTP ${response.status}` };

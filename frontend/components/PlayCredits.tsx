@@ -1,10 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useCurrentAccount, useSignAndExecuteTransaction } from "@mysten/dapp-kit";
+import {
+  useCurrentAccount,
+  useSignAndExecuteTransaction,
+} from "@mysten/dapp-kit";
 import { Transaction } from "@mysten/sui/transactions";
 import { api } from "@/lib/api";
-import { Loader2, Music, AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
+import {
+  Loader2,
+  Music,
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw,
+} from "lucide-react";
 
 interface PlayCreditsInfo {
   remainingPlays: number;
@@ -16,7 +25,7 @@ interface PlayCreditsInfo {
 export function PlayCredits() {
   const account = useCurrentAccount();
   const { mutate: signAndExecuteTransaction } = useSignAndExecuteTransaction();
-  
+
   const [credits, setCredits] = useState<PlayCreditsInfo | null>(null);
   const [loading, setLoading] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
@@ -24,22 +33,37 @@ export function PlayCredits() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [paymentRecipient, setPaymentRecipient] = useState<string>("");
 
   // Default price per play (can be made configurable)
   const PRICE_PER_PLAY = 0.01; // 0.01 SUI per play
-  
-  // Payment recipient address (platform/treasury address)
-  // In production, this should come from environment variable or config
-  const PAYMENT_RECIPIENT = process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT || "0x0000000000000000000000000000000000000000";
 
-  // Load credits when account is available
+  // Load backend wallet address and credits when account is available
   useEffect(() => {
     if (account?.address) {
+      loadConfig();
       loadCredits();
     } else {
       setCredits(null);
     }
   }, [account?.address]);
+
+  const loadConfig = async () => {
+    try {
+      const result = await api.getPublicConfig();
+      if (result.success && result.config?.backendWalletAddress) {
+        setPaymentRecipient(result.config.backendWalletAddress);
+        console.log(
+          "💰 Platform treasury address:",
+          result.config.backendWalletAddress
+        );
+      } else {
+        console.error("Failed to load backend wallet address");
+      }
+    } catch (err: any) {
+      console.error("Error loading config:", err);
+    }
+  };
 
   const loadCredits = async () => {
     if (!account?.address) return;
@@ -48,7 +72,7 @@ export function PlayCredits() {
     setError(null);
     try {
       const result = await api.getPlayCredits(account.address);
-      
+
       if (result.success && result.credits) {
         setCredits(result.credits);
       } else {
@@ -57,8 +81,13 @@ export function PlayCredits() {
     } catch (err: any) {
       console.error("Error loading credits:", err);
       const errorMessage = err.message || "Failed to load play credits";
-      if (errorMessage.includes("Failed to fetch") || errorMessage.includes("NetworkError")) {
-        setError("Cannot connect to backend server. Please ensure it's running on http://localhost:3001");
+      if (
+        errorMessage.includes("Failed to fetch") ||
+        errorMessage.includes("NetworkError")
+      ) {
+        setError(
+          "Cannot connect to backend server. Please ensure it's running on http://localhost:3001"
+        );
       } else {
         setError(errorMessage);
       }
@@ -69,10 +98,10 @@ export function PlayCredits() {
 
   const handleRefresh = async () => {
     if (!account?.address || refreshing) return;
-    
+
     setRefreshing(true);
     setError(null);
-    
+
     try {
       await loadCredits();
       setSuccess("Credits refreshed");
@@ -87,6 +116,16 @@ export function PlayCredits() {
 
   const handlePurchase = async () => {
     if (!account?.address) return;
+
+    if (
+      !paymentRecipient ||
+      paymentRecipient === "0x0000000000000000000000000000000000000000"
+    ) {
+      setError(
+        "Backend wallet address not configured. Please contact support."
+      );
+      return;
+    }
 
     const plays = parseInt(numberOfPlays);
     if (isNaN(plays) || plays <= 0) {
@@ -108,8 +147,8 @@ export function PlayCredits() {
       // Split coin from gas
       const [coin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountInMist)]);
 
-      // Transfer to payment recipient address
-      tx.transferObjects([coin], tx.pure.address(PAYMENT_RECIPIENT));
+      // Transfer to backend wallet (platform treasury)
+      tx.transferObjects([coin], tx.pure.address(paymentRecipient));
 
       // Sign and execute transaction
       await new Promise<void>((resolve, reject) => {
@@ -120,7 +159,10 @@ export function PlayCredits() {
           {
             onSuccess: async (result: any) => {
               console.log("Purchase transaction successful:", result.digest);
-              
+              console.log(
+                `💰 ${totalAmount} SUI sent to platform treasury: ${paymentRecipient}`
+              );
+
               // Record purchase on backend
               try {
                 const purchaseResult = await api.purchasePlayCredits(
@@ -135,16 +177,20 @@ export function PlayCredits() {
                   setNumberOfPlays("10");
                   await loadCredits();
                 } else {
-                  throw new Error(purchaseResult.error || "Failed to record purchase");
+                  throw new Error(
+                    purchaseResult.error || "Failed to record purchase"
+                  );
                 }
               } catch (purchaseError: any) {
                 console.error("Failed to record purchase:", purchaseError);
                 // Transaction succeeded but backend recording failed
                 // Still show success but warn user
-                setSuccess(`Transaction successful but failed to update credits. Please refresh.`);
+                setSuccess(
+                  `Transaction successful but failed to update credits. Please refresh.`
+                );
                 setError("Please refresh your credits manually.");
               }
-              
+
               resolve();
             },
             onError: (error: any) => {
@@ -220,7 +266,9 @@ export function PlayCredits() {
             {credits.remainingPlays === 0 && (
               <div className="flex items-center gap-2 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded text-xs text-yellow-400">
                 <AlertCircle className="w-3 h-3" />
-                <span>No credits remaining. Purchase more to continue listening.</span>
+                <span>
+                  No credits remaining. Purchase more to continue listening.
+                </span>
               </div>
             )}
           </div>
@@ -252,7 +300,9 @@ export function PlayCredits() {
                       <span>Purchasing...</span>
                     </>
                   ) : (
-                    `Buy (${(parseFloat(numberOfPlays) * PRICE_PER_PLAY).toFixed(4)} SUI)`
+                    `Buy (${(
+                      parseFloat(numberOfPlays) * PRICE_PER_PLAY
+                    ).toFixed(4)} SUI)`
                   )}
                 </button>
               </div>
@@ -269,4 +319,3 @@ export function PlayCredits() {
     </div>
   );
 }
-

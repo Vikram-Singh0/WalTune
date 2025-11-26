@@ -28,7 +28,10 @@ export class SuiService {
     // Debug: Log what we're loading
     console.log("🔧 SuiService Configuration:");
     console.log("   PACKAGE_ID:", this.packageId || "❌ NOT SET");
-    console.log("   ARTIST_REGISTRY_ID:", this.artistRegistryId || "❌ NOT SET");
+    console.log(
+      "   ARTIST_REGISTRY_ID:",
+      this.artistRegistryId || "❌ NOT SET"
+    );
     console.log("   SONG_REGISTRY_ID:", this.songRegistryId || "❌ NOT SET");
     console.log("   SUI_NETWORK:", this.network);
     console.log("   SUI_RPC_URL:", rpcUrl);
@@ -304,6 +307,97 @@ export class SuiService {
       }
     } catch (error) {
       console.error("Failed to record play:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
+   * Pay for a play using the Move contract
+   * This transfers SUI from the backend wallet (platform treasury) to the artist
+   * and records the play on the blockchain
+   */
+  async payForPlay(
+    songId: string,
+    pricePerPlay: number
+  ): Promise<{
+    success: boolean;
+    txDigest?: string;
+    error?: string;
+  }> {
+    try {
+      if (!this.packageId) {
+        throw new Error("Smart contracts not configured");
+      }
+
+      console.log(
+        `💰 Paying ${pricePerPlay} SUI for play of song ${songId}...`
+      );
+
+      // Get backend keypair (platform treasury wallet)
+      const privateKeyBase64 = config.BACKEND_PRIVATE_KEY;
+      if (!privateKeyBase64) {
+        throw new Error("BACKEND_PRIVATE_KEY not configured in .env");
+      }
+
+      // Decode from Base64 and remove the first byte (flag byte)
+      const privateKeyBytes = fromBase64(privateKeyBase64);
+      const secretKey = privateKeyBytes.slice(1);
+      const keypair = Ed25519Keypair.fromSecretKey(secretKey);
+
+      // Create transaction to pay for play
+      const tx = new Transaction();
+      const amountInMist = Math.floor(pricePerPlay * 1_000_000_000);
+
+      // Split coin from gas for payment
+      const [paymentCoin] = tx.splitCoins(tx.gas, [tx.pure.u64(amountInMist)]);
+
+      // Call pay_for_play Move function
+      // This will:
+      // 1. Verify payment amount
+      // 2. Record play on Song object
+      // 3. Transfer payment to artist
+      tx.moveCall({
+        target: `${this.packageId}::payment::pay_for_play`,
+        arguments: [tx.object(songId), paymentCoin],
+      });
+
+      // Sign and execute transaction
+      const result = await this.client.signAndExecuteTransaction({
+        signer: keypair,
+        transaction: tx,
+        options: {
+          showEffects: true,
+          showObjectChanges: true,
+        },
+      });
+
+      if (result.effects?.status?.status === "success") {
+        console.log(`✅ Payment transferred to artist. Tx: ${result.digest}`);
+        console.log(`   Amount: ${pricePerPlay} SUI`);
+
+        // Log object changes to see coin transfer
+        if (result.objectChanges) {
+          const transfers = result.objectChanges.filter(
+            (change: any) =>
+              change.type === "transferred" || change.type === "mutated"
+          );
+          console.log(
+            `   Object changes: ${transfers.length} objects affected`
+          );
+        }
+
+        return {
+          success: true,
+          txDigest: result.digest,
+        };
+      } else {
+        throw new Error(`Transaction failed: ${result.effects?.status?.error}`);
+      }
+    } catch (error) {
+      console.error("❌ Failed to pay for play:", error);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",

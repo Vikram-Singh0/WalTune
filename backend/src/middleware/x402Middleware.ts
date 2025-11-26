@@ -78,18 +78,23 @@ export async function x402Middleware(
 
   // Check if this is a play credits payment
   if (paymentPayload.playCredits && paymentPayload.userSuiAddress) {
-    console.log(`Processing play credits payment for user: ${paymentPayload.userSuiAddress}`);
-    
+    console.log(
+      `Processing play credits payment for user: ${paymentPayload.userSuiAddress}`
+    );
+
     // Check if user has available play credits
     const hasCredits = await playCreditsService.hasCredits(
       paymentPayload.userSuiAddress
     );
 
     if (!hasCredits) {
-      console.error(`No play credits available for user: ${paymentPayload.userSuiAddress}`);
+      console.error(
+        `No play credits available for user: ${paymentPayload.userSuiAddress}`
+      );
       reply.code(402).send({
         error: "Insufficient Play Credits",
-        message: "You don't have any play credits. Please purchase credits to play songs.",
+        message:
+          "You don't have any play credits. Please purchase credits to play songs.",
         payment: {
           amount: Math.floor(amount * 1_000_000_000).toString(),
           currency: "SUI",
@@ -119,6 +124,10 @@ export async function x402Middleware(
       });
       return;
     }
+
+    console.log(
+      `✅ Play credit deducted. Remaining: ${useResult.remainingPlays}`
+    );
 
     // Credit used successfully
     (request as any).x402Verified = {
@@ -179,4 +188,3 @@ export function requirePayment(
     songId,
   };
 }
-

@@ -10,6 +10,7 @@ import songRoutes from "./routes/song.routes.js";
 import walrusRoutes from "./routes/walrus.routes.js";
 import x402Routes from "./routes/x402.routes.js";
 import playCreditsRoutes from "./routes/playCredits.routes.js";
+import configRoutes from "./routes/config.routes.js";
 
 const fastify = Fastify({
   logger: {
@@ -59,6 +60,7 @@ async function registerRoutes() {
   await fastify.register(playCreditsRoutes, {
     prefix: "/api/play-credits",
   });
+  await fastify.register(configRoutes, { prefix: "/api/config" });
 }
 
 // Health check

@@ -23,6 +23,7 @@ export const config = {
   ARTIST_REGISTRY_ID: process.env.ARTIST_REGISTRY_ID || "",
   SONG_REGISTRY_ID: process.env.SONG_REGISTRY_ID || "",
   BACKEND_PRIVATE_KEY: process.env.BACKEND_PRIVATE_KEY || "",
+  BACKEND_WALLET_ADDRESS: process.env.BACKEND_WALLET_ADDRESS || "",
 
   // Walrus
   WALRUS_PUBLISHER_URL: process.env.WALRUS_PUBLISHER_URL,
@@ -42,7 +43,16 @@ export const config = {
 // Log configuration on load (only critical values)
 console.log("📋 Configuration loaded:");
 console.log("   PACKAGE_ID:", config.PACKAGE_ID ? "✅ SET" : "❌ NOT SET");
-console.log("   ARTIST_REGISTRY_ID:", config.ARTIST_REGISTRY_ID ? "✅ SET" : "❌ NOT SET");
-console.log("   SONG_REGISTRY_ID:", config.SONG_REGISTRY_ID ? "✅ SET" : "❌ NOT SET");
-console.log("   BACKEND_PRIVATE_KEY:", config.BACKEND_PRIVATE_KEY ? "✅ SET" : "❌ NOT SET");
+console.log(
+  "   ARTIST_REGISTRY_ID:",
+  config.ARTIST_REGISTRY_ID ? "✅ SET" : "❌ NOT SET"
+);
+console.log(
+  "   SONG_REGISTRY_ID:",
+  config.SONG_REGISTRY_ID ? "✅ SET" : "❌ NOT SET"
+);
+console.log(
+  "   BACKEND_PRIVATE_KEY:",
+  config.BACKEND_PRIVATE_KEY ? "✅ SET" : "❌ NOT SET"
+);
 console.log("   DATABASE_URL:", config.DATABASE_URL ? "✅ SET" : "❌ NOT SET");
