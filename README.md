@@ -265,32 +265,7 @@ npm run build
 
 ---
 
-## 🗺️ Roadmap
 
-- [x] Core smart contracts (Artist, Song Registry, Payment)
-- [x] Walrus storage integration
-- [x] Basic frontend UI
-- [x] Wallet connection
-- [ ] x402 micropayment protocol integration
-- [ ] Advanced music player features (playlists, search)
-- [ ] Artist analytics dashboard
-- [ ] Mobile app (React Native)
-- [ ] Revenue sharing for collaborations
-- [ ] NFT integration for exclusive content
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
----
 
 ## 📄 License
 
@@ -298,25 +273,10 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🙏 Acknowledgments
-
-- **Sui Foundation** - For the blockchain infrastructure
-- **Walrus Team** - For decentralized storage solutions
-- **Mysten Labs** - For development tools and SDKs
-- **Open Source Community** - For the amazing libraries and frameworks
-
----
-
-## 📞 Contact & Support
-
-- **Project Repository**: [WalTune](https://github.com/Vikram-Singh0/WalTune)
-- **Issues**: [GitHub Issues](https://github.com/Vikram-Singh0/WalTune/issues)
-
----
 
 <div align="center">
 
-### Built with ❤️ by DonaLabs for creators and music lovers
+### Built with ❤️ by Vikram for creators and music lovers
 
 **Empowering artists through decentralization**
 
